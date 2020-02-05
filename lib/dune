@@ -1,0 +1,6 @@
+(library
+ (name async_http)
+ (public_name async_http)
+ (preprocess
+  (pps ppx_jane))
+ (libraries core async async_ssl httpaf faraday-async))
