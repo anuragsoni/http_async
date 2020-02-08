@@ -20,25 +20,102 @@ let run_client r w ~error_handler ~request =
   Ivar.read resp
 ;;
 
-let connect ~error_handler ~request where_to_connect =
-  Tcp.(with_connection where_to_connect) (fun _ r w ->
-      run_client r w ~request ~error_handler)
+let ssl_connect ?version ?allowed_ciphers ?options ?verify_modes r w =
+  let open Async_ssl in
+  let net_to_ssl, ssl_to_net = Io_util.pipes_from_reader_writer r w in
+  let app_to_ssl, app_writer = Pipe.create () in
+  let app_reader, ssl_to_app = Pipe.create () in
+  Ssl.client
+    ?version
+    ?allowed_ciphers
+    ?options
+    ?verify_modes
+    ~app_to_ssl
+    ~ssl_to_app
+    ~net_to_ssl
+    ~ssl_to_net
+    ()
+  >>= function
+  | Error error -> Io_util.close_reader_writer r w >>= fun () -> Error.raise error
+  | Ok conn ->
+    Io_util.pipes_to_reader_writer app_reader app_writer
+    >>| fun (reader, writer) ->
+    don't_wait_for
+      (Deferred.all_unit [ Reader.close_finished reader; Writer.close_finished writer ]
+      >>| fun () -> Ssl.Connection.close conn);
+    conn, reader, writer
 ;;
 
-module SSl = struct
-  open Async_ssl
+let connect
+    ?buffer_age_limit
+    ?interrupt
+    ?reader_buffer_size
+    ?writer_buffer_size
+    ?timeout
+    ?version
+    ?allowed_ciphers
+    ?options
+    ?verify_modes
+    uri
+    f
+  =
+  let host = Option.value_exn ~here:[%here] (Uri.host uri) in
+  let is_tls =
+    match Uri.scheme uri with
+    | Some "https" | Some "wss" -> true
+    | _ -> false
+  in
+  let port =
+    match Uri.port uri with
+    | None ->
+      (match Uri_services.tcp_port_of_uri uri with
+      | Some p -> Some p
+      | None -> None)
+    | Some p -> Some p
+  in
+  let port = Option.value_exn ~here:[%here] port in
+  Tcp.(
+    with_connection
+      ?buffer_age_limit
+      ?interrupt
+      ?reader_buffer_size
+      ?writer_buffer_size
+      ?timeout
+      (Tcp.Where_to_connect.of_host_and_port (Host_and_port.create ~host ~port))
+      (fun _ r w ->
+        if is_tls
+        then
+          ssl_connect ?version ?allowed_ciphers ?options ?verify_modes r w
+          >>= fun (_conn, r, w) -> f host r w
+        else f host r w))
+;;
 
-  let connect ~error_handler ~request where_to_connect =
-    Tcp.(connect where_to_connect)
-    >>= fun (_, r, w) ->
-    let net_to_ssl, ssl_to_net = Io_util.pipes_from_reader_writer r w in
-    let app_to_ssl, app_writer = Pipe.create () in
-    let app_reader, ssl_to_app = Pipe.create () in
-    Ssl.client ~app_to_ssl ~ssl_to_app ~net_to_ssl ~ssl_to_net ()
-    >>= function
-    | Error error -> Io_util.close_reader_writer r w >>= fun () -> Error.raise error
-    | Ok _conn ->
-      Io_util.pipes_to_reader_writer app_reader app_writer
-      >>= fun (reader, writer) -> run_client reader writer ~request ~error_handler
-  ;;
-end
+let request
+    ~error_handler
+    ~meth
+    ?(headers = Httpaf.Headers.empty)
+    ?buffer_age_limit
+    ?interrupt
+    ?reader_buffer_size
+    ?writer_buffer_size
+    ?version
+    ?allowed_ciphers
+    ?options
+    ?verify_modes
+    uri
+  =
+  connect
+    ?buffer_age_limit
+    ?interrupt
+    ?reader_buffer_size
+    ?writer_buffer_size
+    ?version
+    ?allowed_ciphers
+    ?options
+    ?verify_modes
+    uri
+    (fun host r w ->
+      let headers = Httpaf.Headers.add_unless_exists headers "host" host in
+      let request = Httpaf.Request.create ~headers meth (Uri.path uri) in
+      run_client r w ~request ~error_handler)
+;;

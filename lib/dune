@@ -3,4 +3,4 @@
  (public_name async_http)
  (preprocess
   (pps ppx_jane))
- (libraries core async httpaf faraday async_ssl))
+ (libraries core async httpaf faraday async_ssl uri uri.services))
