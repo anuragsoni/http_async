@@ -61,14 +61,11 @@ let main port () =
       Tcp.Bind_to_address.Localhost
       (Tcp.Bind_to_port.On_port port)
   in
-  Async_http.Server.listen
+  Async_http.Server.listen_ssl
     ~on_handler_error:`Ignore
     ~request_handler
-    ~backlog:11_000
-    ~max_connections:
-      10_000
-      (* ~crt_file:"./certs/RootCA.pem" *)
-      (* ~key_file:"./certs/RootCA.key" *)
+    ~crt_file:"./certs/localhost.pem"
+    ~key_file:"./certs/localhost.key"
     ~error_handler
     where_to_listen
   >>= fun server ->
