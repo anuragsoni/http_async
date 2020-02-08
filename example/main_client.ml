@@ -12,7 +12,7 @@ let main host () =
       ]
   in
   let request = Httpaf.Request.create ~headers `GET "/" in
-  Async_http.SSl.Client.connect ~error_handler ~request w
+  Async_http.Client.SSl.connect ~error_handler ~request w
   >>| fun (r, b) ->
   print_endline (Format.asprintf "%a" Httpaf.Response.pp_hum r);
   print_endline b
