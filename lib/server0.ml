@@ -46,11 +46,7 @@ let create_connection_handler
   let rec writer_thread () =
     match Server_connection.next_write_operation conn with
     | `Write iovecs ->
-      let c =
-        List.fold_left iovecs ~init:0 ~f:(fun c { Faraday.buffer; off; len } ->
-            Writer.write_bigstring writer buffer ~pos:off ~len;
-            c + len)
-      in
+      let c = Io_util.write_iovecs writer iovecs in
       Server_connection.report_write_result conn (`Ok c);
       writer_thread ()
     | `Close _ ->

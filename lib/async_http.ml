@@ -58,35 +58,6 @@ end
 module SSl = struct
   open Async_ssl
 
-  let close_reader_writer reader writer =
-    Writer.close ~force_close:(Clock.after (sec 30.)) writer
-    >>= fun () -> Reader.close reader
-  ;;
-
-  let pipes_from_reader_writer reader writer =
-    let rpipe_reader, wpipe_reader = Pipe.create () in
-    let writer_pipe = Writer.pipe writer in
-    upon (Reader.transfer reader wpipe_reader) (fun () ->
-        close_reader_writer reader writer >>> fun () -> Pipe.close wpipe_reader);
-    upon (Pipe.closed writer_pipe) (fun () ->
-        Deferred.choose
-          [ Deferred.choice (Clock.after (sec 30.)) (fun () -> ())
-          ; Deferred.choice (Pipe.downstream_flushed writer_pipe) (fun _ -> ())
-          ]
-        >>> fun () -> don't_wait_for (close_reader_writer reader writer));
-    rpipe_reader, writer_pipe
-  ;;
-
-  let pipes_to_reader_writer rpipe wpipe =
-    Reader.of_pipe (Info.of_string "ssl_reader") rpipe
-    >>= fun reader ->
-    upon (Reader.close_finished reader) (fun () -> Pipe.close_read rpipe);
-    Writer.of_pipe (Info.of_string "ssl_writer") wpipe
-    >>| fun (writer, _) ->
-    Writer.set_raise_when_consumer_leaves writer false;
-    reader, writer
-  ;;
-
   module Client = struct
     let connect ~error_handler ~request where_to_connect =
       let read_body finished response body =
@@ -100,14 +71,14 @@ module SSl = struct
       in
       Tcp.(connect where_to_connect)
       >>= fun (_, r, w) ->
-      let net_to_ssl, ssl_to_net = pipes_from_reader_writer r w in
+      let net_to_ssl, ssl_to_net = Io_util.pipes_from_reader_writer r w in
       let app_to_ssl, app_writer = Pipe.create () in
       let app_reader, ssl_to_app = Pipe.create () in
       Ssl.client ~app_to_ssl ~ssl_to_app ~net_to_ssl ~ssl_to_net ()
       >>= function
-      | Error error -> close_reader_writer r w >>= fun () -> Error.raise error
+      | Error error -> Io_util.close_reader_writer r w >>= fun () -> Error.raise error
       | Ok _conn ->
-        pipes_to_reader_writer app_reader app_writer
+        Io_util.pipes_to_reader_writer app_reader app_writer
         >>= fun (reader, writer) ->
         let resp = Ivar.create () in
         let response_handler r response response_body =

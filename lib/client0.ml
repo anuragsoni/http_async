@@ -38,11 +38,7 @@ let request ?config ~response_handler ~error_handler request reader writer =
   let rec writer_thread () =
     match Client_connection.next_write_operation conn with
     | `Write iovecs ->
-      let c =
-        List.fold_left iovecs ~init:0 ~f:(fun c { Faraday.buffer; off; len } ->
-            Writer.write_bigstring writer buffer ~pos:off ~len;
-            c + len)
-      in
+      let c = Io_util.write_iovecs writer iovecs in
       Client_connection.report_write_result conn (`Ok c);
       writer_thread ()
     | `Yield -> Client_connection.yield_writer conn writer_thread
