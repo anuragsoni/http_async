@@ -4,7 +4,7 @@ open Async
 let main uri () =
   let w = Uri.of_string uri in
   let error_handler _ = assert false in
-  Async_http.Client.request ~error_handler ~meth:`GET w
+  Async_http.Client.request ~ca_file:"./certs/localhost.crt" ~error_handler ~meth:`GET w
   >>| fun (r, b) ->
   print_endline (Format.asprintf "%a" Httpaf.Response.pp_hum r);
   print_endline b

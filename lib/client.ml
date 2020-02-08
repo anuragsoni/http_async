@@ -20,7 +20,7 @@ let run_client r w ~error_handler ~request =
   Ivar.read resp
 ;;
 
-let ssl_connect ?version ?allowed_ciphers ?options ?verify_modes r w =
+let ssl_connect ?version ?allowed_ciphers ?options ?verify_modes ?ca_file ?ca_path r w =
   let open Async_ssl in
   let net_to_ssl, ssl_to_net = Io_util.pipes_from_reader_writer r w in
   let app_to_ssl, app_writer = Pipe.create () in
@@ -30,6 +30,8 @@ let ssl_connect ?version ?allowed_ciphers ?options ?verify_modes r w =
     ?allowed_ciphers
     ?options
     ?verify_modes
+    ?ca_file
+    ?ca_path
     ~app_to_ssl
     ~ssl_to_app
     ~net_to_ssl
@@ -56,6 +58,8 @@ let connect
     ?allowed_ciphers
     ?options
     ?verify_modes
+    ?ca_file
+    ?ca_path
     uri
     f
   =
@@ -85,7 +89,15 @@ let connect
       (fun _ r w ->
         if is_tls
         then
-          ssl_connect ?version ?allowed_ciphers ?options ?verify_modes r w
+          ssl_connect
+            ?version
+            ?allowed_ciphers
+            ?options
+            ?verify_modes
+            ?ca_file
+            ?ca_path
+            r
+            w
           >>= fun (_conn, r, w) -> f host r w
         else f host r w))
 ;;
@@ -102,6 +114,8 @@ let request
     ?allowed_ciphers
     ?options
     ?verify_modes
+    ?ca_file
+    ?ca_path
     uri
   =
   connect
@@ -113,6 +127,8 @@ let request
     ?allowed_ciphers
     ?options
     ?verify_modes
+    ?ca_file
+    ?ca_path
     uri
     (fun host r w ->
       let headers = Httpaf.Headers.add_unless_exists headers "host" host in
