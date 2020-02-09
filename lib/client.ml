@@ -2,6 +2,7 @@ open Core
 open Async
 
 let run_client r w ~uri ~error_handler ~meth ~headers =
+  (* TODO: Handle http request body. (also switch to using the request type) *)
   let resp = Ivar.create () in
   let read_body body =
     let on_eof' () =
@@ -14,7 +15,11 @@ let run_client r w ~uri ~error_handler ~meth ~headers =
       Pipe.write_if_open writer { Faraday.buffer; off = 0; len }
       >>= fun () -> return @@ `Repeat ()
     in
+    (* Async recommends choosing false for [close_on_exception]. In a normal flow,
+       closing the write end of the pipe will indicate that the writer finished successfully. *)
     Pipe.create_reader ~close_on_exception:false (fun writer ->
+        (* [create_reader] will automatically close the writer end, when this Deferred becomes
+           determined. We loop here so we can process a sequene of Httpaf read events. *)
         Deferred.repeat_until_finished () (fun () ->
             let next_iter = Ivar.create () in
             let on_eof () =
@@ -31,7 +36,9 @@ let run_client r w ~uri ~error_handler ~meth ~headers =
     let body = read_body response_body in
     Ivar.fill_if_empty resp (response, body)
   in
-  let request = Httpaf.Request.create ~headers (meth :> Httpaf.Method.t) (Uri.path_and_query uri) in
+  let request =
+    Httpaf.Request.create ~headers (meth :> Httpaf.Method.t) (Uri.path_and_query uri)
+  in
   let body = Client0.request ~error_handler ~response_handler request r w in
   Httpaf.Body.close_writer body;
   Ivar.read resp
@@ -52,6 +59,7 @@ let ssl_connect
     ?verify_modes
     ?ca_file
     ?ca_path
+    ?hostname
     ?(verify = verify_cert)
     r
     w
@@ -65,6 +73,7 @@ let ssl_connect
     ?allowed_ciphers
     ?options
     ?verify_modes
+    ?hostname
     ?ca_file
     ?ca_path
     ~app_to_ssl
@@ -75,6 +84,8 @@ let ssl_connect
   >>= function
   | Error error -> Io_util.close_reader_writer r w >>= fun () -> Error.raise error
   | Ok conn ->
+    (* [Io_util.pipes_to_reader_writer] will perform cleanup by closing the app_reader/app_writer
+       pipes whenever the resulting reader/writer is closed. *)
     Io_util.pipes_to_reader_writer app_reader app_writer
     >>= fun (reader, writer) ->
     verify conn
@@ -131,6 +142,7 @@ let connect
         ?version
         ?allowed_ciphers
         ?options
+        ?hostname:(Uri.host uri)
         ?verify_modes
         ?ca_file
         ?ca_path
