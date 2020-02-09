@@ -4,9 +4,10 @@ open Async
 type t =
   [ `Empty
   | `String of string
-  | `Bigstring of Bigstring.t Faraday.iovec
-  | `Stream of Bigstring.t Faraday.iovec Pipe.Reader.t
+  | `Bigstring of (Bigstring.t Faraday.iovec[@sexp.opaque])
+  | `Stream of (Bigstring.t Faraday.iovec Pipe.Reader.t[@sexp.opaque])
   ]
+[@@deriving sexp_of]
 
 let empty = `Empty
 let of_string s = `String s
@@ -35,3 +36,6 @@ let drain = function
   | `Stream s -> Pipe.drain s
   | _ -> return ()
 ;;
+
+let pp fmt t = Sexp.pp fmt (sexp_of_t t)
+let pp_hum fmt t = Sexp.pp_hum fmt (sexp_of_t t)

@@ -1,14 +1,66 @@
+open Core
 open Async
-open Httpaf
+
+module Headers : sig
+  type t [@@deriving sexp_of]
+
+  val empty : t
+  val of_list : (string * string) list -> t
+  val to_list : t -> (string * string) list
+  val add_unless_exists : key:string -> value:string -> t -> t
+  val upsert : key:string -> value:string -> t -> t
+  val find : string -> t -> string option
+  val pp : Format.formatter -> t -> unit
+  val pp_hum : Format.formatter -> t -> unit [@@ocaml.toplevel_printer]
+end
 
 module Body : sig
-  type t
+  type t =
+    private
+    [ `Empty
+    | `String of string
+    | `Bigstring of (Bigstring.t Faraday.iovec[@sexp.opaque])
+    | `Stream of (Bigstring.t Faraday.iovec Pipe.Reader.t[@sexp.opaque])
+    ]
+  [@@deriving sexp_of]
 
   val empty : t
   val of_string : string -> t
   val to_string_stream : t -> string Pipe.Reader.t
   val to_string : t -> string Deferred.t
   val drain : t -> unit Deferred.t
+  val pp : Format.formatter -> t -> unit
+  val pp_hum : Format.formatter -> t -> unit [@@ocaml.toplevel_printer]
+end
+
+module Request : sig
+  type meth = Httpaf.Method.t
+
+  type t = private
+    { target : string
+    ; headers : Headers.t
+    ; meth : meth
+    ; body : Body.t
+    }
+  [@@deriving sexp_of, fields]
+
+  val pp : Format.formatter -> t -> unit
+  val pp_hum : Format.formatter -> t -> unit [@@ocaml.toplevel_printer]
+end
+
+module Response : sig
+  type status = Httpaf.Status.t
+
+  type t = private
+    { status : status
+    ; headers : Headers.t
+    ; body : Body.t
+    }
+  [@@deriving sexp_of, fields]
+
+  val create : ?headers:Headers.t -> ?body:Body.t -> status -> t
+  val pp : Format.formatter -> t -> unit
+  val pp_hum : Format.formatter -> t -> unit [@@ocaml.toplevel_printer]
 end
 
 module Server : sig
@@ -19,8 +71,8 @@ module Server : sig
     -> ?backlog:int
     -> ?socket:([ `Unconnected ], ([< Async.Socket.Address.t ] as 'a)) Async.Socket.t
     -> on_handler_error:[ `Call of 'a -> exn -> unit | `Ignore | `Raise ]
-    -> request_handler:('a -> Server_connection.request_handler)
-    -> error_handler:('a -> Server_connection.error_handler)
+    -> request_handler:('a -> Httpaf.Server_connection.request_handler)
+    -> error_handler:('a -> Httpaf.Server_connection.error_handler)
     -> ('a, 'b) Tcp.Where_to_listen.t
     -> ('a, 'b) Tcp.Server.t Deferred.t
 
@@ -38,8 +90,8 @@ module Server : sig
     -> ?ca_path:string
     -> ?verify_modes:Async_ssl.Verify_mode.t list
     -> on_handler_error:[ `Call of 'a -> exn -> unit | `Ignore | `Raise ]
-    -> request_handler:('a -> Server_connection.request_handler)
-    -> error_handler:('a -> Server_connection.error_handler)
+    -> request_handler:('a -> Httpaf.Server_connection.request_handler)
+    -> error_handler:('a -> Httpaf.Server_connection.error_handler)
     -> crt_file:string
     -> key_file:string
     -> ('a, 'b) Tcp.Where_to_listen.t
@@ -48,9 +100,9 @@ end
 
 module Client : sig
   val request
-    :  error_handler:Client_connection.error_handler
-    -> meth:Method.standard
-    -> ?headers:Headers.t
+    :  error_handler:Httpaf.Client_connection.error_handler
+    -> meth:Httpaf.Method.standard
+    -> ?headers:Httpaf.Headers.t
     -> ?buffer_age_limit:Writer.buffer_age_limit
     -> ?interrupt:unit Deferred.t
     -> ?reader_buffer_size:int
@@ -63,5 +115,5 @@ module Client : sig
     -> ?ca_path:string
     -> ?verify:(Async_ssl.Ssl.Connection.t -> bool Deferred.t)
     -> Uri.t
-    -> (Response.t * Body.t) Deferred.t
+    -> Response.t Deferred.t
 end

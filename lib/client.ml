@@ -31,7 +31,7 @@ let run_client r w ~uri ~error_handler ~meth ~headers =
     let body = read_body response_body in
     Ivar.fill_if_empty resp (response, body)
   in
-  let request = Httpaf.Request.create ~headers (meth :> Httpaf.Method.t) (Uri.path uri) in
+  let request = Httpaf.Request.create ~headers (meth :> Httpaf.Method.t) (Uri.path_and_query uri) in
   let body = Client0.request ~error_handler ~response_handler request r w in
   Httpaf.Body.close_writer body;
   Ivar.read resp
@@ -177,5 +177,8 @@ let request
       >>| fun (response, body) ->
       don't_wait_for
         (Pipe.closed body >>= fun () -> Reader.close r >>= fun () -> Writer.close w);
-      response, Body.of_stream body)
+      Response.create
+        ~headers:(Httpaf.Headers.to_list response.Httpaf.Response.headers)
+        ~body:(Body.of_stream body)
+        response.Httpaf.Response.status)
 ;;
