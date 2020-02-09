@@ -61,6 +61,7 @@ module Client : sig
     -> ?verify_modes:Async_ssl.Verify_mode.t list
     -> ?ca_file:string
     -> ?ca_path:string
+    -> ?verify:(Async_ssl.Ssl.Connection.t -> bool Deferred.t)
     -> Uri.t
     -> (Response.t * Body.t) Deferred.t
 end
