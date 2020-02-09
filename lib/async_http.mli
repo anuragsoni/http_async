@@ -1,6 +1,16 @@
 open Async
 open Httpaf
 
+module Body : sig
+  type t
+
+  val empty : t
+  val of_string : string -> t
+  val to_string_stream : t -> string Pipe.Reader.t
+  val to_string : t -> string Deferred.t
+  val drain : t -> unit Deferred.t
+end
+
 module Server : sig
   val listen
     :  ?buffer_age_limit:Writer.buffer_age_limit
@@ -39,7 +49,7 @@ end
 module Client : sig
   val request
     :  error_handler:Client_connection.error_handler
-    -> meth:Method.t
+    -> meth:Method.standard
     -> ?headers:Headers.t
     -> ?buffer_age_limit:Writer.buffer_age_limit
     -> ?interrupt:unit Deferred.t
@@ -52,5 +62,5 @@ module Client : sig
     -> ?ca_file:string
     -> ?ca_path:string
     -> Uri.t
-    -> (Response.t * string) Deferred.t
+    -> (Response.t * Body.t) Deferred.t
 end

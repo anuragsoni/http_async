@@ -1,21 +1,36 @@
 open Core
 open Async
 
-let run_client r w ~error_handler ~request =
-  let read_body finished response body =
-    let bs = Bigbuffer.create 0x100 in
-    let on_eof () = Ivar.fill finished (response, Bigbuffer.contents bs) in
-    let rec on_read buf ~off:pos ~len =
-      Bigbuffer.add_bigstring bs (Bigstring.sub_shared buf ~pos ~len);
-      Httpaf.Body.schedule_read body ~on_eof ~on_read
-    in
-    Httpaf.Body.schedule_read body ~on_eof ~on_read
-  in
+let run_client r w ~uri ~error_handler ~meth ~headers =
   let resp = Ivar.create () in
-  let response_handler r response response_body = read_body r response response_body in
-  let body =
-    Client0.request ~error_handler ~response_handler:(response_handler resp) request r w
+  let read_body body =
+    let on_eof' () =
+      Httpaf.Body.close_reader body;
+      return @@ `Finished ()
+    in
+    let on_read' writer buffer ~off ~len =
+      let fragment_copy = Bigstringaf.copy ~off ~len buffer in
+      Pipe.write_if_open writer fragment_copy >>= fun () -> return @@ `Repeat ()
+    in
+    Pipe.create_reader ~close_on_exception:false (fun writer ->
+        Deferred.repeat_until_finished () (fun () ->
+            let next_iter = Ivar.create () in
+            let on_eof () =
+              don't_wait_for (on_eof' () >>| fun n -> Ivar.fill next_iter n)
+            in
+            let on_read buffer ~off ~len =
+              don't_wait_for
+                (on_read' writer buffer ~off ~len >>| fun n -> Ivar.fill next_iter n)
+            in
+            Httpaf.Body.schedule_read body ~on_eof ~on_read;
+            Ivar.read next_iter))
   in
+  let response_handler response response_body =
+    let body = read_body response_body in
+    Ivar.fill_if_empty resp (response, body)
+  in
+  let request = Httpaf.Request.create ~headers (meth :> Httpaf.Method.t) (Uri.path uri) in
+  let body = Client0.request ~error_handler ~response_handler request r w in
   Httpaf.Body.close_writer body;
   Ivar.read resp
 ;;
@@ -79,27 +94,19 @@ let connect
   in
   let port = Option.value_exn ~here:[%here] port in
   Tcp.(
-    with_connection
+    connect
       ?buffer_age_limit
       ?interrupt
       ?reader_buffer_size
       ?writer_buffer_size
       ?timeout
       (Tcp.Where_to_connect.of_host_and_port (Host_and_port.create ~host ~port))
-      (fun _ r w ->
-        if is_tls
-        then
-          ssl_connect
-            ?version
-            ?allowed_ciphers
-            ?options
-            ?verify_modes
-            ?ca_file
-            ?ca_path
-            r
-            w
-          >>= fun (_conn, r, w) -> f host r w
-        else f host r w))
+    >>= fun (_, r, w) ->
+    if is_tls
+    then
+      ssl_connect ?version ?allowed_ciphers ?options ?verify_modes ?ca_file ?ca_path r w
+      >>= fun (_conn, r, w) -> f host r w
+    else f host r w)
 ;;
 
 let request
@@ -132,6 +139,9 @@ let request
     uri
     (fun host r w ->
       let headers = Httpaf.Headers.add_unless_exists headers "host" host in
-      let request = Httpaf.Request.create ~headers meth (Uri.path uri) in
-      run_client r w ~request ~error_handler)
+      run_client r w ~uri ~meth ~headers ~error_handler
+      >>| fun (response, body) ->
+      don't_wait_for
+        (Pipe.closed body >>= fun () -> Reader.close r >>= fun () -> Writer.close w);
+      response, Body.of_stream body)
 ;;
