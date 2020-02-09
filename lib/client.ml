@@ -8,9 +8,11 @@ let run_client r w ~uri ~error_handler ~meth ~headers =
       Httpaf.Body.close_reader body;
       return @@ `Finished ()
     in
-    let on_read' writer buffer ~off ~len =
-      let fragment_copy = Bigstringaf.copy ~off ~len buffer in
-      Pipe.write_if_open writer fragment_copy >>= fun () -> return @@ `Repeat ()
+    let on_read' writer b ~off ~len =
+      let buffer = Bigstring.create len in
+      Bigstring.blit ~src:b ~src_pos:off ~dst:buffer ~dst_pos:0 ~len;
+      Pipe.write_if_open writer { Faraday.buffer; off = 0; len }
+      >>= fun () -> return @@ `Repeat ()
     in
     Pipe.create_reader ~close_on_exception:false (fun writer ->
         Deferred.repeat_until_finished () (fun () ->
