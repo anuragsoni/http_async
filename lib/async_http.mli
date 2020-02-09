@@ -19,8 +19,8 @@ module Body : sig
     private
     [ `Empty
     | `String of string
-    | `Bigstring of (Bigstring.t Faraday.iovec[@sexp.opaque])
-    | `Stream of (Bigstring.t Faraday.iovec Pipe.Reader.t[@sexp.opaque])
+    | `Bigstring of Bigstring.t
+    | `Stream of Bigstring.t Pipe.Reader.t
     ]
   [@@deriving sexp_of]
 

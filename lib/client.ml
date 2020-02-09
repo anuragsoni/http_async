@@ -12,8 +12,7 @@ let run_client r w ~uri ~error_handler ~meth ~headers =
     let on_read' writer b ~off ~len =
       let buffer = Bigstring.create len in
       Bigstring.blit ~src:b ~src_pos:off ~dst:buffer ~dst_pos:0 ~len;
-      Pipe.write_if_open writer { Faraday.buffer; off = 0; len }
-      >>= fun () -> return @@ `Repeat ()
+      Pipe.write_if_open writer buffer >>= fun () -> return @@ `Repeat ()
     in
     (* Async recommends choosing false for [close_on_exception]. In a normal flow,
        closing the write end of the pipe will indicate that the writer finished successfully. *)
