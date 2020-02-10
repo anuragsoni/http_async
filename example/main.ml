@@ -1,6 +1,5 @@
 open Core
 open Async
-open Httpaf
 
 let text =
   "CHAPTER I. Down the Rabbit-Hole  Alice was beginning to get very tired of sitting by \
@@ -30,21 +29,15 @@ let text =
    the well, and noticed that they were filled with cupboards......"
 ;;
 
-let text = Bigstringaf.of_string ~off:0 ~len:(String.length text) text
+let text = Bigstring.of_string text
 
 let request_handler _ =
-  let headers =
-    Headers.of_list [ "content-length", Int.to_string (Bigstringaf.length text) ]
-  in
-  let handler reqd =
-    let request_body = Reqd.request_body reqd in
-    Body.close_reader request_body;
-    Reqd.respond_with_bigstring reqd (Response.create ~headers `OK) text
-  in
-  handler
+  let open Async_http in
+  return (Response.of_bigstring text)
 ;;
 
 let error_handler _ ?request:_ error start_response =
+  let open Httpaf in
   let response_body = start_response Headers.empty in
   (match error with
   | `Exn exn ->

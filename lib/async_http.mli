@@ -26,6 +26,7 @@ module Body : sig
 
   val empty : t
   val of_string : string -> t
+  val of_bigstring : Bigstring.t -> t
   val to_string_stream : t -> string Pipe.Reader.t
   val to_string : t -> string Deferred.t
   val drain : t -> unit Deferred.t
@@ -61,9 +62,13 @@ module Response : sig
   val create : ?headers:Headers.t -> ?body:Body.t -> status -> t
   val pp : Format.formatter -> t -> unit
   val pp_hum : Format.formatter -> t -> unit [@@ocaml.toplevel_printer]
+  val of_string : ?headers:Headers.t -> ?status:status -> string -> t
+  val of_bigstring : ?headers:Headers.t -> ?status:status -> Bigstring.t -> t
 end
 
 module Server : sig
+  type request_handler = Request.t -> Response.t Deferred.t
+
   val listen
     :  ?buffer_age_limit:Writer.buffer_age_limit
     -> ?max_connections:int
@@ -71,7 +76,7 @@ module Server : sig
     -> ?backlog:int
     -> ?socket:([ `Unconnected ], ([< Async.Socket.Address.t ] as 'a)) Async.Socket.t
     -> on_handler_error:[ `Call of 'a -> exn -> unit | `Ignore | `Raise ]
-    -> request_handler:('a -> Httpaf.Server_connection.request_handler)
+    -> request_handler:request_handler
     -> error_handler:('a -> Httpaf.Server_connection.error_handler)
     -> ('a, 'b) Tcp.Where_to_listen.t
     -> ('a, 'b) Tcp.Server.t Deferred.t
@@ -90,7 +95,7 @@ module Server : sig
     -> ?ca_path:string
     -> ?verify_modes:Async_ssl.Verify_mode.t list
     -> on_handler_error:[ `Call of 'a -> exn -> unit | `Ignore | `Raise ]
-    -> request_handler:('a -> Httpaf.Server_connection.request_handler)
+    -> request_handler:request_handler
     -> error_handler:('a -> Httpaf.Server_connection.error_handler)
     -> crt_file:string
     -> key_file:string

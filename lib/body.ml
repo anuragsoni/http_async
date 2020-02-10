@@ -11,6 +11,7 @@ type t =
 
 let empty = `Empty
 let of_string s = `String s
+let of_bigstring b = `Bigstring b
 
 let to_string = function
   | `Empty -> return ""
