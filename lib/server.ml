@@ -26,8 +26,8 @@ let to_httpaf_handler request_handler =
       | `Stream s ->
         let response_body = Httpaf.Reqd.respond_with_streaming reqd r in
         upon (Pipe.closed s) (fun () -> Httpaf.Body.close_writer response_body);
-        Pipe.iter_without_pushback s ~f:(fun s ->
-            Httpaf.Body.schedule_bigstring response_body s))
+        Pipe.iter_without_pushback s ~f:(fun { Core.Unix.IOVec.buf; pos; len } ->
+            Httpaf.Body.schedule_bigstring ~len ~off:pos response_body buf))
   in
   handler
 ;;

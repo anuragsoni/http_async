@@ -20,7 +20,7 @@ module Body : sig
     [ `Empty
     | `String of string
     | `Bigstring of Bigstring.t
-    | `Stream of Bigstring.t Pipe.Reader.t
+    | `Stream of Bigstring.t Core.Unix.IOVec.t Pipe.Reader.t
     ]
   [@@deriving sexp_of]
 
@@ -70,7 +70,7 @@ module Response : sig
   val of_stream
     :  ?headers:Headers.t
     -> ?status:status
-    -> (Bigstring.t Pipe.Writer.t -> unit Deferred.t)
+    -> (Bigstring.t Core.Unix.IOVec.t Pipe.Writer.t -> unit Deferred.t)
     -> t
 end
 
