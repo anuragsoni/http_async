@@ -1,4 +1,5 @@
 open Core
+open Async
 
 type status = Httpaf.Status.t
 
@@ -36,4 +37,12 @@ let of_bigstring ?(headers = Headers.empty) ?(status = `OK) body =
       headers
   in
   create ~headers ~body:(Body.of_bigstring body) status
+;;
+
+let of_stream ?(headers = Headers.empty) ?(status = `OK) f =
+  let reader = Pipe.create_reader ~close_on_exception:false f in
+  let headers =
+    Headers.add_unless_exists ~key:"transfer-encoding" ~value:"chunked" headers
+  in
+  create ~headers ~body:(Body.of_stream reader) status
 ;;

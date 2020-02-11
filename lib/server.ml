@@ -25,10 +25,9 @@ let to_httpaf_handler request_handler =
       | `String s -> return (Httpaf.Reqd.respond_with_string reqd r s)
       | `Stream s ->
         let response_body = Httpaf.Reqd.respond_with_streaming reqd r in
-        Pipe.iter s ~f:(fun s ->
-            Httpaf.Body.schedule_bigstring response_body s;
-            return ())
-        >>| fun () -> Httpaf.Body.close_writer response_body)
+        upon (Pipe.closed s) (fun () -> Httpaf.Body.close_writer response_body);
+        Pipe.iter_without_pushback s ~f:(fun s ->
+            Httpaf.Body.schedule_bigstring response_body s))
   in
   handler
 ;;
