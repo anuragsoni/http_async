@@ -1,0 +1,24 @@
+name: Async_http
+on:
+  pull_request:
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ocaml-version: [ '4.08.1', '4.09.0' ]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: avsm/setup-ocaml@v1.0
+        with:
+          ocaml-version: ${{ matrix.ocaml-version }}
+      - name: Install dependencies
+        run: |
+          opam env
+          opam pin add async-http.dev -n .
+          opam depext -yt async-http
+          opam install -t . --deps-only
+      - name: build all
+        run: opam exec -- dune build
