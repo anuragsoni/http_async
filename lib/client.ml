@@ -10,8 +10,9 @@ let run_client r w ~uri ~error_handler ~meth ~headers =
       return @@ `Finished ()
     in
     let on_read' writer b ~off ~len =
-      Pipe.write_if_open writer (Core.Unix.IOVec.of_bigstring ~pos:off ~len b)
-      >>= fun () -> return @@ `Repeat ()
+      let module Unix = Core.Unix in
+      let%map () = Pipe.write_if_open writer (Unix.IOVec.of_bigstring ~pos:off ~len b) in
+      `Repeat ()
     in
     (* Async recommends choosing false for [close_on_exception]. In a normal flow,
        closing the write end of the pipe will indicate that the writer finished successfully. *)
@@ -66,32 +67,31 @@ let ssl_connect
   let net_to_ssl, ssl_to_net = Io_util.pipes_from_reader_writer r w in
   let app_to_ssl, app_writer = Pipe.create () in
   let app_reader, ssl_to_app = Pipe.create () in
-  Ssl.client
-    ?version
-    ?allowed_ciphers
-    ?options
-    ?verify_modes
-    ?hostname
-    ?ca_file
-    ?ca_path
-    ~app_to_ssl
-    ~ssl_to_app
-    ~net_to_ssl
-    ~ssl_to_net
-    ()
-  >>= function
+  match%bind
+    Ssl.client
+      ?version
+      ?allowed_ciphers
+      ?options
+      ?verify_modes
+      ?hostname
+      ?ca_file
+      ?ca_path
+      ~app_to_ssl
+      ~ssl_to_app
+      ~net_to_ssl
+      ~ssl_to_net
+      ()
+  with
   | Error error -> Io_util.close_reader_writer r w >>= fun () -> Error.raise error
   | Ok conn ->
     (* [Io_util.pipes_to_reader_writer] will perform cleanup by closing the app_reader/app_writer
        pipes whenever the resulting reader/writer is closed. *)
-    Io_util.pipes_to_reader_writer app_reader app_writer
-    >>= fun (reader, writer) ->
-    verify conn
-    >>= (function
+    let%bind reader, writer = Io_util.pipes_to_reader_writer app_reader app_writer in
+    (match%bind verify conn with
     | true -> return (conn, reader, writer)
     | false ->
-      Io_util.close_reader_writer reader writer
-      >>= fun () -> Error.raise (Error.of_string "Failed to validate certificate"))
+      let%bind () = Io_util.close_reader_writer reader writer in
+      Error.raise (Error.of_string "Failed to validate certificate"))
 ;;
 
 let connect

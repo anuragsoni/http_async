@@ -3,7 +3,7 @@ open Async
 
 let request_handler _ =
   let open Async_http in
-  Response.of_bigstring ( Bigstring.of_string Test_data.text )
+  Response.of_bigstring (Bigstring.of_string Test_data.text)
 ;;
 
 let error_handler _ ?request:_ error start_response =

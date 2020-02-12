@@ -12,22 +12,21 @@ let to_httpaf_handler request_handler =
     let body = Body.empty in
     let request = { Request.target = req.Httpaf.Request.target; headers; meth; body } in
     don't_wait_for
-      (request_handler request
-      >>= fun response ->
-      let headers =
-        Httpaf.Headers.of_rev_list @@ Headers.to_list response.Response.headers
-      in
-      let status = response.Response.status in
-      let r = Httpaf.Response.create ~headers status in
-      match response.Response.body with
-      | `Empty -> return (Httpaf.Reqd.respond_with_string reqd r "")
-      | `Bigstring b -> return (Httpaf.Reqd.respond_with_bigstring reqd r b)
-      | `String s -> return (Httpaf.Reqd.respond_with_string reqd r s)
-      | `Stream s ->
-        let response_body = Httpaf.Reqd.respond_with_streaming reqd r in
-        upon (Pipe.closed s) (fun () -> Httpaf.Body.close_writer response_body);
-        Pipe.iter_without_pushback s ~f:(fun { Core.Unix.IOVec.buf; pos; len } ->
-            Httpaf.Body.schedule_bigstring ~len ~off:pos response_body buf))
+      (let%bind response = request_handler request in
+       let headers =
+         Httpaf.Headers.of_rev_list @@ Headers.to_list response.Response.headers
+       in
+       let status = response.Response.status in
+       let r = Httpaf.Response.create ~headers status in
+       match response.Response.body with
+       | `Empty -> return (Httpaf.Reqd.respond_with_string reqd r "")
+       | `Bigstring b -> return (Httpaf.Reqd.respond_with_bigstring reqd r b)
+       | `String s -> return (Httpaf.Reqd.respond_with_string reqd r s)
+       | `Stream s ->
+         let response_body = Httpaf.Reqd.respond_with_streaming reqd r in
+         upon (Pipe.closed s) (fun () -> Httpaf.Body.close_writer response_body);
+         Pipe.iter_without_pushback s ~f:(fun { Core.Unix.IOVec.buf; pos; len } ->
+             Httpaf.Body.schedule_bigstring ~len ~off:pos response_body buf))
   in
   handler
 ;;
@@ -91,22 +90,23 @@ let listen_ssl
       let net_to_ssl, ssl_to_net = Io_util.pipes_from_reader_writer reader writer in
       let app_to_ssl, app_writer = Pipe.create () in
       let app_reader, ssl_to_app = Pipe.create () in
-      Ssl.server
-        ?version
-        ?options
-        ?name
-        ?allowed_ciphers
-        ?ca_file
-        ?ca_path
-        ?verify_modes
-        ~crt_file
-        ~key_file
-        ~net_to_ssl
-        ~ssl_to_net
-        ~ssl_to_app
-        ~app_to_ssl
-        ()
-      >>= function
+      match%bind
+        Ssl.server
+          ?version
+          ?options
+          ?name
+          ?allowed_ciphers
+          ?ca_file
+          ?ca_path
+          ?verify_modes
+          ~crt_file
+          ~key_file
+          ~net_to_ssl
+          ~ssl_to_net
+          ~ssl_to_app
+          ~app_to_ssl
+          ()
+      with
       | Error err ->
         Io_util.close_reader_writer reader writer >>= fun () -> Error.raise err
       | Ok conn ->

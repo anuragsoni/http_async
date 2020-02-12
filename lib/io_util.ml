@@ -12,8 +12,8 @@ let write_iovecs writer iovecs =
     the writer casues the writer to raise an exception because
     of a closed file descriptor. *)
 let close_reader_writer reader writer =
-  Writer.close ~force_close:(Clock.after (sec 30.)) writer
-  >>= fun () -> Reader.close reader
+  let%bind () = Writer.close ~force_close:(Clock.after (sec 30.)) writer in
+  Reader.close reader
 ;;
 
 (* We do this, instead of using [Reader.pipe] because we don't
@@ -37,12 +37,10 @@ let pipes_from_reader_writer reader writer =
 ;;
 
 let pipes_to_reader_writer rpipe wpipe =
-  Reader.of_pipe (Info.of_string "ssl_reader") rpipe
-  >>= fun reader ->
+  let%bind reader = Reader.of_pipe (Info.of_string "ssl_reader") rpipe in
   (* [Reader.of_pipe] does not close the pipe automatically when the reader is finished. *)
   upon (Reader.close_finished reader) (fun () -> Pipe.close_read rpipe);
-  Writer.of_pipe (Info.of_string "ssl_writer") wpipe
-  >>| fun (writer, _) ->
+  let%map writer, _ = Writer.of_pipe (Info.of_string "ssl_writer") wpipe in
   Writer.set_raise_when_consumer_leaves writer false;
   reader, writer
 ;;
