@@ -62,16 +62,19 @@ module Response : sig
   val create : ?headers:Headers.t -> ?body:Body.t -> status -> t
   val pp : Format.formatter -> t -> unit
   val pp_hum : Format.formatter -> t -> unit [@@ocaml.toplevel_printer]
-  val of_string : ?headers:Headers.t -> ?status:status -> string -> t
-  val of_bigstring : ?headers:Headers.t -> ?status:status -> Bigstring.t -> t
+  val of_string : ?headers:Headers.t -> ?status:status -> string -> t Deferred.t
+  val of_bigstring : ?headers:Headers.t -> ?status:status -> Bigstring.t -> t Deferred.t
 
   (** Use [of_stream] to start a chunked http response. Use the {{:https://ocaml.janestreet.com/ocaml-core/latest/doc/async_kernel/Async_kernel/Pipe/index.html#writing} write} operations for an Async pipe. The stream
       is closed once the [unit Deferred.t] is determined. *)
   val of_stream
     :  ?headers:Headers.t
     -> ?status:status
+    -> ?size:Int64.t
     -> (Bigstring.t Core.Unix.IOVec.t Pipe.Writer.t -> unit Deferred.t)
-    -> t
+    -> t Deferred.t
+
+  val of_file : ?headers:Headers.t -> ?status:status -> string -> t Deferred.t
 end
 
 module Server : sig
