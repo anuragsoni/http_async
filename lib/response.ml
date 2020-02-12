@@ -52,27 +52,30 @@ let of_stream ?(headers = Headers.empty) ?(status = `OK) ?size f =
 
 let of_file ?(headers = Headers.empty) ?(status = `OK) name =
   let module Unix = Core.Unix in
-  Monitor.try_with ~name:"static file handler" (fun () ->
-      let%map stat = Async_unix.Unix.stat name
-      and reader = Reader.open_file name in
-      let size = Async_unix.Unix.Stats.size stat in
-      let mime = Magic_mime.lookup name in
-      let headers = Headers.add_unless_exists ~key:"content-type" ~value:mime headers in
-      let write_pipe writer =
-        match%map
-          Reader.read_one_chunk_at_a_time reader ~handle_chunk:(fun chunk ~pos ~len ->
-              let%map () =
-                Pipe.write_if_open writer (Unix.IOVec.of_bigstring chunk ~pos ~len)
-              in
-              `Consumed (len, `Need_unknown))
-        with
-        | `Stopped () -> assert false
-        | `Eof_with_unconsumed_data d ->
-          let d' = Bigstring.of_string d in
-          Pipe.write_without_pushback_if_open writer (Unix.IOVec.of_bigstring d')
-        | `Eof -> ()
-      in
-      of_stream ~headers ~status ~size write_pipe)
+  Monitor.try_with ~run:`Now ~here:[%here] ~name:"static file handler" (fun () ->
+      let%bind stat = Async_unix.Unix.stat name in
+      match Async_unix.Unix.Stats.kind stat with
+      | `File ->
+        let%map reader = Reader.open_file name in
+        let size = Async_unix.Unix.Stats.size stat in
+        let mime = Magic_mime.lookup name in
+        let headers = Headers.add_unless_exists ~key:"content-type" ~value:mime headers in
+        let write_pipe writer =
+          match%map
+            Reader.read_one_chunk_at_a_time reader ~handle_chunk:(fun chunk ~pos ~len ->
+                let%map () =
+                  Pipe.write_if_open writer (Unix.IOVec.of_bigstring chunk ~pos ~len)
+                in
+                `Consumed (len, `Need_unknown))
+          with
+          | `Stopped () -> assert false
+          | `Eof_with_unconsumed_data d ->
+            let d' = Bigstring.of_string d in
+            Pipe.write_without_pushback_if_open writer (Unix.IOVec.of_bigstring d')
+          | `Eof -> ()
+        in
+        of_stream ~headers ~status ~size write_pipe
+      | _ -> Error.raise (Error.of_thunk (fun () -> "Not a file")))
   >>= function
   | Ok r -> r
   | Error _ -> (* TODO: Log this somehow *) of_string ~status:`Not_found "File not found"

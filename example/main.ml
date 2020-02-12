@@ -3,7 +3,7 @@ open Async
 
 let request_handler _ =
   let open Async_http in
-  Response.of_bigstring (Bigstring.of_string Test_data.text)
+  Response.of_file "./test/big.txt"
 ;;
 
 let error_handler _ ?request:_ error start_response =
@@ -24,11 +24,11 @@ let main port () =
       Tcp.Bind_to_address.Localhost
       (Tcp.Bind_to_port.On_port port)
   in
-  Async_http.Server.listen
+  Async_http.Server.listen_ssl
     ~on_handler_error:`Ignore
     ~request_handler
-      (* ~crt_file:"./certs/localhost.pem" *)
-      (* ~key_file:"./certs/localhost.key" *)
+    ~crt_file:"./certs/localhost.pem"
+    ~key_file:"./certs/localhost.key"
     ~error_handler
     where_to_listen
   >>= fun server ->
