@@ -14,6 +14,7 @@ depends: [
   "async" {>= "0.13"}
   "ppx_jane"
   "httpaf"
+  "routes" {with-dev}
   "faraday"
   "async_ssl" {>= "0.13"}
   "uri"
@@ -33,3 +34,6 @@ build: [
   ]
 ]
 dev-repo: "git+https://github.com/anuragsoni/async-http.git"
+pin-depends: [
+  [ "routes.dev" "git+https://github.com/anuragsoni/routes.git#58c6a136299e9919004cb481ee2130d8c069ea82" ]
+]

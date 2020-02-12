@@ -1,0 +1,3 @@
+pin-depends: [
+  [ "routes.dev" "git+https://github.com/anuragsoni/routes.git#58c6a136299e9919004cb481ee2130d8c069ea82" ]
+]

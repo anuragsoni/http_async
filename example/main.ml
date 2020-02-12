@@ -1,9 +1,29 @@
 open Core
 open Async
 
-let request_handler _ =
+module R = struct
+  open Routes
+  open Async_http
+
+  let not_found = Response.of_string ~status:`Not_found "Not found"
+
+  let routes =
+    one_of
+      [ (nil @--> fun _req -> Response.of_string "Hello World")
+      ; ((s "greet" / str /? nil)
+        @--> fun a req ->
+        let message = "Hello, " ^ a in
+        Log.Global.info_s ([%sexp_of: Request.t] req);
+        Response.of_string message)
+      ]
+  ;;
+end
+
+let request_handler req =
   let open Async_http in
-  Response.of_file "./test/big.txt"
+  match Routes.match' ~target:req.Request.target R.routes with
+  | None -> R.not_found
+  | Some r -> r req
 ;;
 
 let error_handler _ ?request:_ error start_response =

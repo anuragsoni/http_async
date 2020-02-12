@@ -29,6 +29,7 @@
    (>= 0.13))
   ppx_jane
   httpaf
+  (routes :with-dev)
   faraday
   (async_ssl
    (>= 0.13))
