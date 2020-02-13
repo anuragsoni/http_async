@@ -22,20 +22,8 @@ end
 let request_handler req =
   let open Async_http in
   match Routes.match' ~target:req.Request.target R.routes with
-  | None -> R.not_found
+  | None -> Error.raise @@ Error.of_string "foo"
   | Some r -> r req
-;;
-
-let error_handler _ ?request:_ error start_response =
-  let open Httpaf in
-  let response_body = start_response Headers.empty in
-  (match error with
-  | `Exn exn ->
-    Body.write_string response_body (Exn.to_string exn);
-    Body.write_string response_body "\n"
-  | #Status.standard as error ->
-    Body.write_string response_body (Status.default_reason_phrase error));
-  Body.close_writer response_body
 ;;
 
 let main port () =
@@ -49,7 +37,6 @@ let main port () =
     ~request_handler
     ~crt_file:"./certs/localhost.pem"
     ~key_file:"./certs/localhost.key"
-    ~error_handler
     where_to_listen
   >>= fun server ->
   Log.Global.info "Listening on http://localhost:%d" port;

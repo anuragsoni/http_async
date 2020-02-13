@@ -82,6 +82,9 @@ module Service : sig
 end
 
 module Server : sig
+  type error_handler =
+    ?request:Request.t -> Httpaf.Server_connection.error -> Response.t Deferred.t
+
   val listen
     :  ?buffer_age_limit:Writer.buffer_age_limit
     -> ?max_connections:int
@@ -90,7 +93,7 @@ module Server : sig
     -> ?socket:([ `Unconnected ], ([< Async.Socket.Address.t ] as 'a)) Async.Socket.t
     -> on_handler_error:[ `Call of 'a -> exn -> unit | `Ignore | `Raise ]
     -> request_handler:Service.t
-    -> error_handler:('a -> Httpaf.Server_connection.error_handler)
+    -> ?error_handler:error_handler
     -> ('a, 'b) Tcp.Where_to_listen.t
     -> ('a, 'b) Tcp.Server.t Deferred.t
 
@@ -109,7 +112,7 @@ module Server : sig
     -> ?verify_modes:Async_ssl.Verify_mode.t list
     -> on_handler_error:[ `Call of 'a -> exn -> unit | `Ignore | `Raise ]
     -> request_handler:Service.t
-    -> error_handler:('a -> Httpaf.Server_connection.error_handler)
+    -> ?error_handler:error_handler
     -> crt_file:string
     -> key_file:string
     -> ('a, 'b) Tcp.Where_to_listen.t
