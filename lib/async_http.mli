@@ -77,9 +77,11 @@ module Response : sig
   val of_file : ?headers:Headers.t -> ?status:status -> string -> t Deferred.t
 end
 
-module Server : sig
-  type request_handler = Request.t -> Response.t Deferred.t
+module Service : sig
+  type t = Request.t -> Response.t Deferred.t
+end
 
+module Server : sig
   val listen
     :  ?buffer_age_limit:Writer.buffer_age_limit
     -> ?max_connections:int
@@ -87,7 +89,7 @@ module Server : sig
     -> ?backlog:int
     -> ?socket:([ `Unconnected ], ([< Async.Socket.Address.t ] as 'a)) Async.Socket.t
     -> on_handler_error:[ `Call of 'a -> exn -> unit | `Ignore | `Raise ]
-    -> request_handler:request_handler
+    -> request_handler:Service.t
     -> error_handler:('a -> Httpaf.Server_connection.error_handler)
     -> ('a, 'b) Tcp.Where_to_listen.t
     -> ('a, 'b) Tcp.Server.t Deferred.t
@@ -106,7 +108,7 @@ module Server : sig
     -> ?ca_path:string
     -> ?verify_modes:Async_ssl.Verify_mode.t list
     -> on_handler_error:[ `Call of 'a -> exn -> unit | `Ignore | `Raise ]
-    -> request_handler:request_handler
+    -> request_handler:Service.t
     -> error_handler:('a -> Httpaf.Server_connection.error_handler)
     -> crt_file:string
     -> key_file:string
