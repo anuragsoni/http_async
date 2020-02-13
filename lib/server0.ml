@@ -65,7 +65,15 @@ let create_connection_handler
   Scheduler.within ~monitor writer_thread;
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
       Server_connection.report_exn conn exn);
-  let ps = Deferred.all_unit [ Ivar.read write_complete; Ivar.read read_complete ] in
-  (* TODO: fix this. Should not need to wait a second for this *)
-  Deferred.any_unit [ ps; (Ivar.read error_ivar >>= fun () -> after Time.Span.second) ]
+  (* Wait for the [error_ivar] to be filled by the server error handler, and once that's done
+     we can try to close the reader/writer which will close the underlying file descriptor *)
+  upon (Ivar.read error_ivar) (fun () ->
+      don't_wait_for @@ Io_util.close_reader_writer reader writer);
+  let read_write_finished =
+    Deferred.all_unit [ Ivar.read write_complete; Ivar.read read_complete ]
+  in
+  Deferred.any_unit
+    [ read_write_finished
+    ; Deferred.all_unit [ Reader.close_finished reader; Writer.close_finished writer ]
+    ]
 ;;
