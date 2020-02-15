@@ -31,6 +31,7 @@
   httpaf
   (routes :with-dev)
   faraday
+  magic-mime
   (async_ssl
    (>= 0.13))
   uri))
