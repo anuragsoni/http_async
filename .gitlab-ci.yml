@@ -13,8 +13,7 @@ before_script:
   - apt install -y opam
   - opam init --bare --disable-sandboxing
   - eval $(opam env)
-  - opam switch create . 4.09.0 --no-install
-  - echo ocaml --version
+  - '[ ! -d "_opam" ] && opam switch create . 4.09.0 --no-install'
   - opam pin add async-http.dev -n .
   - opam depext async-http
   - opam install -t . --deps-only
