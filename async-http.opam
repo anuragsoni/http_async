@@ -36,5 +36,5 @@ build: [
 ]
 dev-repo: "git+https://gitlab.com/anuragsoni/async-http.git"
 pin-depends: [
-  [ "routes.dev" "git+https://github.com/anuragsoni/routes.git#58c6a136299e9919004cb481ee2130d8c069ea82" ]
+  [ "routes.dev" "git+https://github.com/anuragsoni/routes.git#ba2b5245ff7143a16238e8f62cd08f9a6e570eff" ]
 ]

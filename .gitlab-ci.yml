@@ -11,9 +11,9 @@ cache:
 before_script:
   - apt update
   - apt install -y opam
-  - opam init --bare
-  - opam switch create . 4.09.0 --no-install
+  - opam init --bare --disable-sandboxing
   - eval $(opam env)
+  - opam switch create . 4.09.0 --no-install
   - echo ocaml --version
   - opam pin add async-http.dev -n .
   - opam depext async-http
