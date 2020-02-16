@@ -1,16 +1,21 @@
-image: ocaml/opam2:4.09
+variables:
+  GIT_DEPTH: "1"
+  OPAMYES: "true"
+
+image: ubuntu:19.10
 
 cache:
   paths:
-    - ~/.opam
+    - _opam
 
 before_script:
-  - opam repo set-url default https://opam.ocaml.org
-  - opam update
-  - opam upgrade
-  - opam depext conf-m4 conf-libev
+  - apt update
+  - apt install -y opam
+  - opam init --bare --disable-sandboxing
+  - eval $(opam env)
+  - '[ ! -d "_opam" ] && opam switch create . 4.09.0 --no-install'
   - opam pin add async-http.dev -n .
-  - opam depext -yt async-http
+  - opam depext async-http
   - opam install -t . --deps-only
 
 build:
