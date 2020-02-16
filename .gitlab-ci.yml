@@ -2,17 +2,15 @@ variables:
   GIT_DEPTH: "1"
   OPAMYES: "true"
 
-image: ubuntu:19.10
+image: ocaml/opam2:alpine-3.10-opam
 
 cache:
+  key: "alpine-key"
   paths:
     - _opam
 
 before_script:
-  - apt update
-  - apt install -y opam
-  - opam init --bare --disable-sandboxing
-  - eval $(opam env)
+  - opam init --bare
   - '[ ! -d "_opam" ] && opam switch create . 4.09.0 --no-install'
   - opam pin add async-http.dev -n .
   - opam depext async-http
@@ -22,8 +20,13 @@ build:
   stage: build
   script:
     - opam exec -- dune build
+  only:
+    - master
 
 test:
   stage: test
   script:
+    - opam exec -- dune build
     - opam exec -- dune runtest
+  only:
+    - merge_request
