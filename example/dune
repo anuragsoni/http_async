@@ -3,3 +3,7 @@
  (preprocess
   (pps ppx_jane))
  (libraries async_http routes))
+
+(alias
+  (name examples)
+  (deps main.exe main_client.exe))

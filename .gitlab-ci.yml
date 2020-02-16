@@ -1,0 +1,24 @@
+image: ocaml/opam2:4.09
+
+cache:
+  paths:
+    - ~/.opam
+
+before_script:
+  - opam repo set-url default https://opam.ocaml.org
+  - opam update
+  - opam upgrade
+  - opam depext conf-m4 conf-libev
+  - opam pin add async-http.dev -n .
+  - opam depext -yt async-http
+  - opam install -t . --deps-only
+
+build:
+  stage: build
+  script:
+    - opam exec -- dune build
+
+test:
+  stage: test
+  script:
+    - opam exec -- dune runtest
