@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "source": "./async-http.opam",
+  "override": {
+    "buildsInSource": "_build",
+    "resolutions": {
+      "@opam/routes": "anuragsoni/routes:routes.opam#58c6a136299e9919004cb481ee2130d8c069ea82"
+    }
+  }
+}

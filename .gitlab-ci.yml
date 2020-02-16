@@ -1,22 +1,28 @@
 variables:
   GIT_DEPTH: "1"
 
-image: ocaml/opam2:alpine-3.10
+image: ubuntu:19.10
+
+cache:
+  key: esy-cache
+  paths:
+    - ~/.esy/3____________________________________________________________________/i/
 
 before_script:
-  - opam repo set-url default https://opam.ocaml.org
-  - opam update
-  - opam depext conf-m4 conf-libev
-  - opam pin add async-http.dev -n .
-  - opam depext -yt async-http
-  - opam install -t . --deps-only
+  - apt update
+  - apt install -y nodejs npm m4 patch
+  - mkdir ~/.npm-global
+  - npm config set prefix '~/.npm-global'
+  - npm install -g esy@0.6.2 --unsafe-perm=true
+  - ~/.npm-global/bin/esy fetch
 
 build:
   stage: build
   script:
-    - opam exec -- dune build
+    - ~/.npm-global/bin/esy build
+    - ~/.npm-global/bin/esy dune build @examples
 
 test:
   stage: test
   script:
-    - opam exec -- dune runtest
+    - ~/.npm-global/bin/esy dune runtest
