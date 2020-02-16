@@ -3,4 +3,3 @@ _build
 *.merlin
 _opam
 _esy
-node_modules
