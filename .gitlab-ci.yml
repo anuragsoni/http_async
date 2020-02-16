@@ -1,13 +1,11 @@
-image: ocaml/opam2:4.09
+variables:
+  GIT_DEPTH: "1"
 
-cache:
-  paths:
-    - ~/.opam
+image: ocaml/opam2:alpine-3.10
 
 before_script:
   - opam repo set-url default https://opam.ocaml.org
   - opam update
-  - opam upgrade
   - opam depext conf-m4 conf-libev
   - opam pin add async-http.dev -n .
   - opam depext -yt async-http
