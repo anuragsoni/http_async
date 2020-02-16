@@ -128,6 +128,7 @@ module Client : sig
     -> ?interrupt:unit Deferred.t
     -> ?reader_buffer_size:int
     -> ?writer_buffer_size:int
+    -> ?timeout:Time.Span.t
     -> ?version:Async_ssl.Version.t
     -> ?allowed_ciphers:[ `Only of string list | `Openssl_default | `Secure ]
     -> ?options:Async_ssl.Opt.t list

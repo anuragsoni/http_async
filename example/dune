@@ -5,5 +5,5 @@
  (libraries async_http routes))
 
 (alias
-  (name examples)
-  (deps main.exe main_client.exe))
+ (name examples)
+ (deps main.exe main_client.exe))

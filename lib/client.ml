@@ -159,6 +159,7 @@ let request
     ?interrupt
     ?reader_buffer_size
     ?writer_buffer_size
+    ?timeout
     ?version
     ?allowed_ciphers
     ?options
@@ -173,6 +174,7 @@ let request
     ?interrupt
     ?reader_buffer_size
     ?writer_buffer_size
+    ?timeout
     ?version
     ?allowed_ciphers
     ?options
