@@ -5,7 +5,11 @@
 (generate_opam_files true)
 
 (source
- (github anuragsoni/async-http))
+ (uri "git+https://gitlab.com/anuragsoni/async-http.git"))
+
+(bug_reports "https://gitlab.com/anuragsoni/async-http/issues")
+
+(homepage "https://gitlab.com/anuragsoni/async-http.git")
 
 (authors "Anurag Soni <anurag@sonianurag.com>")
 
@@ -29,7 +33,7 @@
    (>= 0.13))
   ppx_jane
   httpaf
-  (routes :with-dev)
+  (routes :with-test)
   faraday
   magic-mime
   (async_ssl
