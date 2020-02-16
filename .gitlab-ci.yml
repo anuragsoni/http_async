@@ -10,9 +10,9 @@ cache:
 
 before_script:
   - apt update
-  - apt install -y opam m4 pkg-config libev-dev
+  - apt install -y opam
   - opam init --bare
-  - opam switch create . 4.09.0 --deps-only
+  - opam switch create . 4.09.0 --no-install
   - eval $(opam env)
   - echo ocaml --version
   - opam pin add async-http.dev -n .
