@@ -1,3 +1,5 @@
+open Core
+
 let text =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor \
    incididunt ut labore et dolore magna aliqua. Pretium vulputate sapien nec sagittis. \
@@ -55,4 +57,5 @@ let text =
    Tellus integer feugiat scelerisque varius morbi. Elementum integer enim neque \
    volutpat ac tincidunt vitae semper quis. Non arcu risus quis varius. Amet consectetur \
    adipiscing elit duis. Diam sollicitudin tempor id eu."
+  |> Bigstring.of_string
 ;;

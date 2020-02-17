@@ -1,0 +1,6 @@
+(library
+ (name async_http)
+ (public_name async-http)
+ (preprocess
+  (pps ppx_jane))
+ (libraries async async_ssl core httpaf))

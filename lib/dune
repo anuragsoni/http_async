@@ -1,7 +1,0 @@
-(library
- (name async_http)
- (public_name async-http)
- (inline_tests)
- (preprocess
-  (pps ppx_jane))
- (libraries core async httpaf faraday async_ssl uri uri.services magic-mime))
