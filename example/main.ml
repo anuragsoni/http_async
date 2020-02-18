@@ -20,7 +20,12 @@ let request_handler =
 let main port =
   let where_to_listen = Tcp.Where_to_listen.of_port port in
   let request_handler _conn = request_handler in
-  Tcp.(Server.create ~on_handler_error:`Ignore where_to_listen)
+  Async_connection.(
+    Server.create
+      ~crt_file:"./certs/localhost.pem"
+      ~key_file:"./certs/localhost.key"
+      ~on_handler_error:`Ignore
+      where_to_listen)
     (Async_http.Server.create_connection_handler ~request_handler)
   >>= fun server ->
   Deferred.forever () (fun () ->

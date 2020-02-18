@@ -18,6 +18,23 @@
 (license MIT)
 
 (package
+ (name async-connection)
+ (synopsis "Async connections")
+ (depends
+  (ocaml
+   (>= 4.08.0))
+  (dune
+   (>= 2.1))
+  (core
+   (>= 0.13))
+  (async
+   (>= 0.13))
+  (ppx_jane
+   (>= 0.13))
+  (async_ssl
+   (>= 0.13))))
+
+(package
  (name async-http)
  (synopsis "Async web toolkit")
  (tags

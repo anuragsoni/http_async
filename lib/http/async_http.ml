@@ -78,8 +78,6 @@ module Server = struct
       | `Yield -> Server_connection.yield_writer conn writer_thread
     in
     let monitor = Monitor.create ~here:[%here] ~name:"AsyncHttpServer" () in
-    Scheduler.within ~monitor reader_thread;
-    Scheduler.within ~monitor writer_thread;
     Monitor.detach_and_iter_errors monitor ~f:(fun e ->
         (* TODO: verify that this doesn't cause any issues.
            In situations where the exception happens before reader is finished,
@@ -88,6 +86,8 @@ module Server = struct
         *)
         Ivar.fill_if_empty read_complete ();
         Server_connection.report_exn conn e);
+    Scheduler.within ~monitor reader_thread;
+    Scheduler.within ~monitor writer_thread;
     let read_write_finished =
       Deferred.all_unit [ Ivar.read write_complete; Ivar.read read_complete ]
     in

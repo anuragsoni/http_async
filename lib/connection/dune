@@ -1,0 +1,6 @@
+(library
+ (name async_connection)
+ (public_name async-connection)
+ (preprocess
+  (pps ppx_jane))
+ (libraries core async async_ssl))
