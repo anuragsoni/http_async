@@ -1,3 +1,4 @@
+open Core
 open Async
 
 module Server : sig
@@ -20,4 +21,44 @@ module Server : sig
     -> ('a, 'b) Tcp.Where_to_listen.t
     -> ('a -> Reader.t -> Writer.t -> unit Deferred.t)
     -> ('a, 'b) Tcp.Server.t Deferred.t
+end
+
+module Client : sig
+  open Async_ssl
+
+  type ssl_options =
+    { version : Version.t option
+    ; options : Opt.t list option
+    ; name : string option
+    ; hostname : string option
+    ; allowed_ciphers : [ `Only of string list | `Openssl_default | `Secure ] option
+    ; ca_file : string option
+    ; ca_path : string option
+    ; crt_file : string option
+    ; key_file : string option
+    ; verify_modes : Verify_mode.t list option
+    ; session : (Ssl.Session.t[@sexp.opaque]) option
+    }
+  [@@deriving sexp_of, fields]
+
+  val default_ssl_options : ssl_options
+
+  type mode =
+    | Secure of ssl_options
+    | Regular
+  [@@deriving sexp_of]
+
+  val with_connection
+    :  mode
+    -> ?buffer_age_limit:[ `At_most of Core__.Core_time_float.Span.t | `Unlimited ]
+    -> ?interrupt:unit Deferred.t
+    -> ?reader_buffer_size:int
+    -> ?writer_buffer_size:int
+    -> ?timeout:Time.Span.t
+    -> ([< Socket.Address.t ] as 'a) Tcp.Where_to_connect.t
+    -> (([ `Active ], 'a) Socket.t
+        -> Reader.t
+        -> Writer.t
+        -> ('b, Error.t) Result.t Async.Deferred.t)
+    -> ('b, Error.t) Result.t Async.Deferred.t
 end
