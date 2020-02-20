@@ -50,7 +50,6 @@
    (>= 0.13))
   ppx_jane
   httpaf
-  (routes :with-test)
   faraday
   magic-mime
   (async_ssl
