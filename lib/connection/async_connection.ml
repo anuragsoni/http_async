@@ -1,6 +1,7 @@
 open Core
 open Async
 open Async_ssl
+module Logger = Log.Make_global ()
 
 module Server = struct
   let create_ssl handler ~crt_file ~key_file r w =
@@ -12,7 +13,7 @@ module Server = struct
       Ssl.server ~crt_file ~key_file ~net_to_ssl ~ssl_to_net ~ssl_to_app ~app_to_ssl ()
     with
     | Error e ->
-      Log.Global.error_s (Error.sexp_of_t e);
+      Logger.error_s ([%sexp_of: Error.t] e);
       return ()
     | Ok conn ->
       let%bind reader =
@@ -30,7 +31,7 @@ module Server = struct
         let%bind () =
           match%map Ssl.Connection.closed conn with
           | Ok _ -> ()
-          | Error e -> Log.Global.error "Error happened: %s" (Error.to_string_hum e)
+          | Error e -> Logger.error_s ([%sexp_of: Error.t] e)
         in
         Reader.close reader
       in
@@ -130,7 +131,7 @@ module Client = struct
         ()
     with
     | Error err ->
-      Log.Global.error_s (Error.sexp_of_t err);
+      Logger.error_s ([%sexp_of: Error.t] err);
       return (Error err)
     | Ok conn ->
       let%bind reader =
@@ -148,7 +149,7 @@ module Client = struct
         let%bind () =
           match%map Ssl.Connection.closed conn with
           | Ok _ -> ()
-          | Error e -> Log.Global.error "Error happened: %s" (Error.to_string_hum e)
+          | Error e -> Logger.error_s ([%sexp_of: Error.t] e)
         in
         Reader.close reader
       in

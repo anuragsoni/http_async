@@ -30,8 +30,7 @@ let main port =
   >>= fun server ->
   Deferred.forever () (fun () ->
       Clock.after Time.Span.(of_sec 0.5)
-      >>| fun () ->
-      Log.Global.printf "connections: %d" (Tcp.Server.num_connections server));
+      >>| fun () -> Log.Global.info "connections: %d" (Tcp.Server.num_connections server));
   Deferred.never ()
 ;;
 

@@ -1,6 +1,7 @@
 open Core
 open Async
 open Httpaf
+module Logger = Logger
 
 let write_iovecs writer iovecs =
   List.fold_left iovecs ~init:0 ~f:(fun c { Faraday.buffer; off; len } ->
@@ -12,8 +13,8 @@ module Server = struct
   let default_error_handler ?request:_ error start_response =
     let message =
       match error with
-      | `Exn _e ->
-        (* TODO: log exception somewhere *)
+      | `Exn e ->
+        Logger.error_s ([%sexp_of: Exn.t] e);
         Status.default_reason_phrase `Internal_server_error
       | (#Status.server_error | #Status.client_error) as error ->
         Status.default_reason_phrase error

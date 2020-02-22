@@ -1,5 +1,6 @@
 open Core
 open Async
+module Logger : Log.Global_intf
 
 module Server : sig
   (** [create] delegates to Async's [Tcp.Server.create]. It
