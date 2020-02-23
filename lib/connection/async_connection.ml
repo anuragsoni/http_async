@@ -130,9 +130,7 @@ module Client = struct
         ~ssl_to_net
         ()
     with
-    | Error err ->
-      Logger.error_s ([%sexp_of: Error.t] err);
-      return (Error err)
+    | Error err -> Error.raise err
     | Ok conn ->
       let%bind reader =
         Reader.of_pipe (Info.of_string "async_connection.ssl.client.reader") app_reader

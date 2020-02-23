@@ -57,9 +57,6 @@ module Client : sig
     -> ?writer_buffer_size:int
     -> ?timeout:Time.Span.t
     -> ([< Socket.Address.t ] as 'a) Tcp.Where_to_connect.t
-    -> (([ `Active ], 'a) Socket.t
-        -> Reader.t
-        -> Writer.t
-        -> ('b, Error.t) Result.t Async.Deferred.t)
-    -> ('b, Error.t) Result.t Async.Deferred.t
+    -> (([ `Active ], 'a) Socket.t -> Reader.t -> Writer.t -> 'b Async.Deferred.t)
+    -> 'b Async.Deferred.t
 end

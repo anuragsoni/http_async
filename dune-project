@@ -51,6 +51,7 @@
   ppx_jane
   httpaf
   faraday
+  uri-sexp
   magic-mime
   (async_ssl
    (>= 0.13))
