@@ -83,6 +83,7 @@ module Client = struct
     ; key_file : string option
     ; verify_modes : Verify_mode.t list option
     ; session : (Ssl.Session.t[@sexp.opaque]) option
+    ; verify_peer : Ssl.Connection.t -> unit Or_error.t
     }
   [@@deriving sexp_of, fields]
 
@@ -98,6 +99,7 @@ module Client = struct
       ?key_file
       ?verify_modes
       ?session
+      ?(verify_peer = fun _ -> Or_error.return ())
       ()
     =
     { version
@@ -111,6 +113,7 @@ module Client = struct
     ; key_file
     ; verify_modes
     ; session
+    ; verify_peer
     }
   ;;
 
@@ -145,6 +148,7 @@ module Client = struct
     with
     | Error err -> Error.raise err
     | Ok conn ->
+      let () = opts.verify_peer conn |> Or_error.ok_exn in
       let%bind reader =
         Reader.of_pipe (Info.of_string "async_connection.ssl.client.reader") app_reader
       in

@@ -39,6 +39,7 @@ module Client : sig
     ; key_file : string option
     ; verify_modes : Verify_mode.t list option
     ; session : (Ssl.Session.t[@sexp.opaque]) option
+    ; verify_peer : Ssl.Connection.t -> unit Or_error.t
     }
   [@@deriving sexp_of, fields]
 
@@ -54,6 +55,7 @@ module Client : sig
     -> ?key_file:string
     -> ?verify_modes:Verify_mode.t list
     -> ?session:Ssl.Session.t
+    -> ?verify_peer:(Ssl.Connection.t -> unit Or_error.t)
     -> unit
     -> ssl_options
 
