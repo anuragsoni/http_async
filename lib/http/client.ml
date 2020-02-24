@@ -71,7 +71,7 @@ let response_handler resp finished response response_body =
 ;;
 
 let request
-    ?(ssl_options = Async_connection.Client.default_ssl_options)
+    ?(ssl_options = Async_connection.Client.create_ssl_options ())
     ?(headers = Httpaf.Headers.empty)
     meth
     uri

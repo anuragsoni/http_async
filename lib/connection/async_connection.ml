@@ -86,19 +86,32 @@ module Client = struct
     }
   [@@deriving sexp_of, fields]
 
-  let default_ssl_options =
-    Fields_of_ssl_options.create
-      ~version:None
-      ~options:None
-      ~name:None
-      ~hostname:None
-      ~allowed_ciphers:None
-      ~ca_file:None
-      ~ca_path:None
-      ~crt_file:None
-      ~key_file:None
-      ~verify_modes:None
-      ~session:None
+  let create_ssl_options
+      ?version
+      ?options
+      ?name
+      ?hostname
+      ?allowed_ciphers
+      ?ca_file
+      ?ca_path
+      ?crt_file
+      ?key_file
+      ?verify_modes
+      ?session
+      ()
+    =
+    { version
+    ; options
+    ; name
+    ; hostname
+    ; allowed_ciphers
+    ; ca_file
+    ; ca_path
+    ; crt_file
+    ; key_file
+    ; verify_modes
+    ; session
+    }
   ;;
 
   type mode =

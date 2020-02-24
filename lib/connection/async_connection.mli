@@ -42,7 +42,20 @@ module Client : sig
     }
   [@@deriving sexp_of, fields]
 
-  val default_ssl_options : ssl_options
+  val create_ssl_options
+    :  ?version:Version.t
+    -> ?options:Opt.t list
+    -> ?name:string
+    -> ?hostname:string
+    -> ?allowed_ciphers:[ `Only of string list | `Openssl_default | `Secure ]
+    -> ?ca_file:string
+    -> ?ca_path:string
+    -> ?crt_file:string
+    -> ?key_file:string
+    -> ?verify_modes:Verify_mode.t list
+    -> ?session:Ssl.Session.t
+    -> unit
+    -> ssl_options
 
   type mode =
     | Secure of ssl_options
