@@ -39,40 +39,34 @@ let connection_param_of_uri ssl_options uri =
 ;;
 
 let response_handler resp finished response response_body =
-  let on_eof' () =
-    Httpaf.Body.close_reader response_body;
-    Ivar.fill finished ();
-    return @@ `Finished ()
-  in
-  let on_read' writer b ~off ~len =
-    let module Unix = Core.Unix in
-    let%map () = Pipe.write_if_open writer (Unix.IOVec.of_bigstring ~pos:off ~len b) in
-    `Repeat ()
-  in
-  let body =
-    (* Async recommends choosing false for [close_on_exception]. In a normal flow,
-       closing the write end of the pipe will indicate that the writer finished successfully. *)
-    Pipe.create_reader ~close_on_exception:false (fun writer ->
-        (* [create_reader] will automatically close the writer end, when this Deferred becomes
-           determined. We loop here so we can process a chain of Httpaf read events. *)
-        Deferred.repeat_until_finished () (fun () ->
-            let next_iter = Ivar.create () in
-            let on_eof () =
-              don't_wait_for (on_eof' () >>| fun n -> Ivar.fill next_iter n)
-            in
-            let on_read buffer ~off ~len =
-              don't_wait_for
-                (on_read' writer buffer ~off ~len >>| fun n -> Ivar.fill next_iter n)
-            in
-            Httpaf.Body.schedule_read response_body ~on_eof ~on_read;
-            Ivar.read next_iter))
-  in
-  Ivar.fill resp (Or_error.return (response, Body.stream body))
+  let body = Body.read_httpaf_body finished response_body in
+  Ivar.fill resp (Or_error.return (response, body))
+;;
+
+let write_body body request_body =
+  match body with
+  | None -> Deferred.unit
+  | Some body ->
+    (match body with
+    | Body.Empty -> Deferred.unit
+    | String s ->
+      Httpaf.Body.write_string request_body s;
+      Deferred.unit
+    | Bigstring { Core.Unix.IOVec.buf; pos; len } ->
+      Httpaf.Body.write_bigstring request_body ~off:pos ~len buf;
+      Deferred.unit
+    | Stream s ->
+      Pipe.iter_without_pushback
+        ~continue_on_error:true
+        ~f:(fun { Core.Unix.IOVec.buf; pos; len } ->
+          Httpaf.Body.write_bigstring request_body ~off:pos ~len buf)
+        s)
 ;;
 
 let request
     ?(ssl_options = Async_connection.Client.create_ssl_options ())
     ?(headers = Httpaf.Headers.empty)
+    ?body
     meth
     uri
   =
@@ -81,6 +75,16 @@ let request
   | Ok (mode, host_and_port) ->
     let headers =
       Httpaf.Headers.add_unless_exists headers "Host" (Host_and_port.host host_and_port)
+    in
+    let headers =
+      match body with
+      | None -> headers
+      | Some b ->
+        (match Body.kind b with
+        | Body.Fixed len ->
+          Httpaf.Headers.add_unless_exists headers "Content-length" (Int64.to_string len)
+        | Chunked ->
+          Httpaf.Headers.add_unless_exists headers "transfer-encoding" "chunked")
     in
     let request = Httpaf.Request.create ~headers meth (Uri.path_and_query uri) in
     let finished = Ivar.create () in
@@ -98,9 +102,14 @@ let request
                reader
                writer
            in
+           let%bind () = write_body (Option.map ~f:Body.content body) request_body in
            Httpaf.Body.close_writer request_body;
            Ivar.read finished));
     Ivar.read resp
 ;;
 
 let get ?ssl_options ?headers uri = request ?ssl_options ?headers `GET uri
+
+let post ?ssl_options ?headers ?(body = Body.empty) uri =
+  request ?ssl_options ?headers ~body `POST uri
+;;
