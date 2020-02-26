@@ -3,37 +3,20 @@ open Async
 
 module Body : sig
   type iovec = Bigstring.t Core.Unix.IOVec.t [@@deriving sexp_of]
-
-  type length =
-    private
-    [ `Fixed of Int64.t
-    | `Chunked
-    | `Close_delimited
-    | `Error of [ `Bad_gateway | `Internal_server_error ]
-    | `Unknown
-    ]
-  [@@deriving sexp_of]
-
-  type content = private
-    | Empty
-    | String of string
-    | Bigstring of iovec
-    | Stream of iovec Pipe.Reader.t
-  [@@deriving sexp_of]
+  type content = iovec Pipe.Reader.t [@@deriving sexp_of]
 
   type t = private
-    { length : length
+    { length : Int64.t option
     ; content : content
     }
   [@@deriving sexp_of, fields]
 
   val drain : t -> unit Deferred.t
   val to_string : t -> string Deferred.t
-  val to_pipe : t -> iovec Pipe.Reader.t
   val empty : t
   val of_string : string -> t
   val of_bigstring : Bigstring.t -> t
-  val of_stream : ?length:length -> iovec Pipe.Reader.t -> t
+  val of_stream : ?length:Int64.t -> iovec Pipe.Reader.t -> t
 end
 
 module Server : sig

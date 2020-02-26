@@ -39,32 +39,25 @@ let connection_param_of_uri ssl_options uri =
 ;;
 
 let response_handler request_method resp finished response response_body =
-  let length = Httpaf.Response.body_length ~request_method response in
-  let body =
-    Body.read_httpaf_body ~length:(length :> Body.length) finished response_body
+  let length =
+    match Httpaf.Response.body_length ~request_method response with
+    | `Fixed l -> Some l
+    | _ -> None
   in
-  Logger.info !"Body length %{sexp: Body.length}" (Body.length body);
+  let body = Body.read_httpaf_body ?length finished response_body in
   Ivar.fill resp (Or_error.return (response, body))
 ;;
 
 let write_body body request_body =
   match body with
   | None -> Deferred.unit
-  | Some body ->
-    (match body with
-    | Body.Empty -> Deferred.unit
-    | String s ->
-      Httpaf.Body.write_string request_body s;
-      Deferred.unit
-    | Bigstring { Core.Unix.IOVec.buf; pos; len } ->
-      Httpaf.Body.write_bigstring request_body ~off:pos ~len buf;
-      Deferred.unit
-    | Stream s ->
-      Pipe.iter_without_pushback
-        ~continue_on_error:true
-        ~f:(fun { Core.Unix.IOVec.buf; pos; len } ->
-          Httpaf.Body.write_bigstring request_body ~off:pos ~len buf)
-        s)
+  | Some s ->
+    Pipe.iter_without_pushback
+      ~continue_on_error:true
+      ~f:(fun { Core.Unix.IOVec.buf; pos; len } ->
+        Httpaf.Body.write_bigstring request_body ~off:pos ~len buf;
+        Httpaf.Body.flush request_body (fun () -> ()))
+      s
 ;;
 
 let request
@@ -85,13 +78,9 @@ let request
       | None -> headers
       | Some b ->
         (match Body.length b with
-        | `Fixed len ->
+        | Some len ->
           Httpaf.Headers.add_unless_exists headers "Content-length" (Int64.to_string len)
-        | `Chunked ->
-          Httpaf.Headers.add_unless_exists headers "transfer-encoding" "chunked"
-        | `Close_delimited ->
-          Httpaf.Headers.add_unless_exists headers "transfer-encoding" "close"
-        | `Error _ | `Unknown -> headers)
+        | None -> Httpaf.Headers.add_unless_exists headers "transfer-encoding" "chunked")
     in
     let request =
       Httpaf.Request.create ~headers (meth :> Httpaf.Method.t) (Uri.path_and_query uri)
