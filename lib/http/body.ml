@@ -7,9 +7,13 @@ type iovec = Bigstring.t Unix.IOVec.t [@@deriving sexp_of]
 let iovec_to_string { Unix.IOVec.buf; pos; len } = Bigstring.to_string buf ~pos ~len
 let iovec_of_string s = Unix.IOVec.of_bigstring (Bigstring.of_string s)
 
-type kind =
-  | Fixed of Int64.t
-  | Chunked
+type length =
+  [ `Fixed of Int64.t
+  | `Chunked
+  | `Close_delimited
+  | `Error of [ `Bad_gateway | `Internal_server_error ]
+  | `Unknown
+  ]
 [@@deriving sexp_of]
 
 type content =
@@ -20,7 +24,7 @@ type content =
 [@@deriving sexp_of]
 
 type t =
-  { kind : kind
+  { length : length
   ; content : content
   }
 [@@deriving sexp_of, fields]
@@ -50,22 +54,22 @@ let to_pipe { content; _ } =
   | Stream s -> s
 ;;
 
-let of_string s = { content = String s; kind = Fixed (Int64.of_int (String.length s)) }
+let of_string s = { content = String s; length = `Fixed (Int64.of_int (String.length s)) }
 
 let of_bigstring b =
   { content = Bigstring (Unix.IOVec.of_bigstring b)
-  ; kind = Fixed (Int64.of_int (Bigstring.length b))
+  ; length = `Fixed (Int64.of_int (Bigstring.length b))
   }
 ;;
 
 let of_stream ?length s =
-  let kind = Option.value_map ~default:Chunked ~f:(fun x -> Fixed x) length in
-  { content = Stream s; kind }
+  let length = Option.value_map ~default:`Unknown ~f:(fun x -> x) length in
+  { content = Stream s; length }
 ;;
 
-let empty = { content = Empty; kind = Fixed 0L }
+let empty = { content = Empty; length = `Fixed 0L }
 
-let read_httpaf_body finished body =
+let read_httpaf_body ?length finished body =
   let on_eof' () =
     Httpaf.Body.close_reader body;
     Ivar.fill finished ();
@@ -94,5 +98,5 @@ let read_httpaf_body finished body =
             Httpaf.Body.schedule_read body ~on_eof ~on_read;
             Ivar.read next_iter))
   in
-  of_stream b
+  of_stream ?length b
 ;;

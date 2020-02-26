@@ -38,8 +38,12 @@ let connection_param_of_uri ssl_options uri =
   mode, host_and_port
 ;;
 
-let response_handler resp finished response response_body =
-  let body = Body.read_httpaf_body finished response_body in
+let response_handler request_method resp finished response response_body =
+  let length = Httpaf.Response.body_length ~request_method response in
+  let body =
+    Body.read_httpaf_body ~length:(length :> Body.length) finished response_body
+  in
+  Logger.info !"Body length %{sexp: Body.length}" (Body.length body);
   Ivar.fill resp (Or_error.return (response, body))
 ;;
 
@@ -80,13 +84,18 @@ let request
       match body with
       | None -> headers
       | Some b ->
-        (match Body.kind b with
-        | Body.Fixed len ->
+        (match Body.length b with
+        | `Fixed len ->
           Httpaf.Headers.add_unless_exists headers "Content-length" (Int64.to_string len)
-        | Chunked ->
-          Httpaf.Headers.add_unless_exists headers "transfer-encoding" "chunked")
+        | `Chunked ->
+          Httpaf.Headers.add_unless_exists headers "transfer-encoding" "chunked"
+        | `Close_delimited ->
+          Httpaf.Headers.add_unless_exists headers "transfer-encoding" "close"
+        | `Error _ | `Unknown -> headers)
     in
-    let request = Httpaf.Request.create ~headers meth (Uri.path_and_query uri) in
+    let request =
+      Httpaf.Request.create ~headers (meth :> Httpaf.Method.t) (Uri.path_and_query uri)
+    in
     let finished = Ivar.create () in
     let resp = Ivar.create () in
     don't_wait_for
@@ -96,7 +105,7 @@ let request
          (fun _addr reader writer ->
            let request_body =
              Protocol.Client.request
-               ~response_handler:(response_handler resp finished)
+               ~response_handler:(response_handler meth resp finished)
                ~error_handler:(fun _ -> assert false)
                request
                reader

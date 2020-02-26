@@ -4,9 +4,14 @@ open Async
 module Body : sig
   type iovec = Bigstring.t Core.Unix.IOVec.t [@@deriving sexp_of]
 
-  type kind = private
-    | Fixed of Int64.t
-    | Chunked
+  type length =
+    private
+    [ `Fixed of Int64.t
+    | `Chunked
+    | `Close_delimited
+    | `Error of [ `Bad_gateway | `Internal_server_error ]
+    | `Unknown
+    ]
   [@@deriving sexp_of]
 
   type content = private
@@ -17,7 +22,7 @@ module Body : sig
   [@@deriving sexp_of]
 
   type t = private
-    { kind : kind
+    { length : length
     ; content : content
     }
   [@@deriving sexp_of, fields]
@@ -28,7 +33,7 @@ module Body : sig
   val empty : t
   val of_string : string -> t
   val of_bigstring : Bigstring.t -> t
-  val of_stream : ?length:Int64.t -> iovec Pipe.Reader.t -> t
+  val of_stream : ?length:length -> iovec Pipe.Reader.t -> t
 end
 
 module Server : sig
@@ -47,7 +52,7 @@ module Client : sig
     :  ?ssl_options:Async_connection.Client.ssl_options
     -> ?headers:Httpaf.Headers.t
     -> ?body:Body.t
-    -> Httpaf.Method.t
+    -> Httpaf.Method.standard
     -> Uri.t
     -> (Httpaf.Response.t * Body.t) Deferred.Or_error.t
 
