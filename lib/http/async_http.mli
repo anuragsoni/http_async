@@ -1,6 +1,29 @@
 open Core
 open Async
 
+module Headers : sig
+  module Header_key : sig
+    type t [@@deriving sexp, compare]
+
+    val to_string : t -> string
+    val of_string : string -> t Or_error.t
+  end
+
+  module Header_value : sig
+    type t [@@deriving sexp, compare]
+
+    val to_string : t -> string
+    val of_string : string -> t Or_error.t
+  end
+
+  type t [@@deriving sexp]
+
+  val empty : t
+  val add : string -> string list -> t -> t Or_error.t
+  val pp : Format.formatter -> t -> unit
+  val pp_hum : Format.formatter -> t -> unit [@@ocaml.toplevel_printer]
+end
+
 module Body : sig
   type iovec = Bigstring.t Core.Unix.IOVec.t [@@deriving sexp_of]
   type content = iovec Pipe.Reader.t [@@deriving sexp_of]

@@ -6,15 +6,19 @@ let connection_param_of_uri ssl_options uri =
     Result.of_option
       (Uri.host uri)
       ~error:
-        (Error.create_s
-           [%message "Could not determine host from uri" ~uri:(uri : Uri_sexp.t)])
+        (Error.create
+           "Could not determine host from uri"
+           ("uri", uri)
+           [%sexp_of: string * Uri_sexp.t])
   in
   let scheme =
     Result.of_option
       (Uri.scheme uri)
       ~error:
-        (Error.create_s
-           [%message "Could not determine uri scheme" ~uri:(uri : Uri_sexp.t)])
+        (Error.create
+           "Could not determine uri scheme"
+           ("uri", uri)
+           [%sexp_of: string * Uri_sexp.t])
   in
   let open Or_error.Let_syntax in
   let%bind host = host
@@ -26,7 +30,11 @@ let connection_param_of_uri ssl_options uri =
     | _, _, "ws" -> Ok 80
     | _, _, "wss" -> Ok 443
     | _ ->
-      Error (Error.create_s [%message "Could not determine port" ~uri:(uri : Uri_sexp.t)])
+      Error
+        (Error.create
+           "Could not determine port"
+           ("uri", uri)
+           [%sexp_of: string * Uri_sexp.t])
   in
   let host_and_port = Host_and_port.create ~host ~port in
   let%map mode =
@@ -36,6 +44,17 @@ let connection_param_of_uri ssl_options uri =
     | _ -> Error (Error.create_s [%message "invalid uri scheme" ~scheme])
   in
   mode, host_and_port
+;;
+
+let%test_unit "create connection params" =
+  let make = connection_param_of_uri @@ Async_connection.Client.create_ssl_options () in
+  [%test_result: bool] (make (Uri.of_string "foobar") |> Or_error.is_error) ~expect:true;
+  [%test_result: Host_and_port.t]
+    (make (Uri.of_string "https://httpbin.org") |> Or_error.ok_exn |> snd)
+    ~expect:(Host_and_port.create ~host:"httpbin.org" ~port:443);
+  [%test_result: Host_and_port.t]
+    (make (Uri.of_string "ws://httpbin.org") |> Or_error.ok_exn |> snd)
+    ~expect:(Host_and_port.create ~host:"httpbin.org" ~port:80)
 ;;
 
 let response_handler request_method resp finished response response_body =
