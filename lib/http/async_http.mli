@@ -19,7 +19,9 @@ module Headers : sig
   type t [@@deriving sexp]
 
   val empty : t
-  val add : string -> string list -> t -> t Or_error.t
+  val insert : Header_key.t -> Header_value.t -> t -> t
+  val find : Header_key.t -> t -> Header_value.t list option
+  val remove : Header_key.t -> t -> t
   val pp : Format.formatter -> t -> unit
   val pp_hum : Format.formatter -> t -> unit [@@ocaml.toplevel_printer]
 end

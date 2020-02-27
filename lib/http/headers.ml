@@ -44,18 +44,8 @@ end
 type t = Header_value.t list Map.M(Header_key).t [@@deriving sexp]
 
 let empty = Map.empty (module Header_key)
-
-let add key data t =
-  match data with
-  | [] -> Or_error.error_string "Header values can't be empty"
-  | _ ->
-    let open Or_error.Let_syntax in
-    let%map header_name = Header_key.of_string key
-    and header_values =
-      Or_error.combine_errors (List.map ~f:Header_value.of_string data)
-    in
-    Map.update t header_name ~f:(fun _ -> header_values)
-;;
-
+let insert key data t = Map.add_multi t ~key ~data
+let find key t = Map.find t key
+let remove key t = Map.remove t key
 let pp fmt t = Sexp.pp fmt (sexp_of_t t)
 let pp_hum fmt t = Sexp.pp_hum fmt (sexp_of_t t)
