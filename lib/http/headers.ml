@@ -21,6 +21,7 @@ module Header_key = struct
            [%sexp_of: string * t])
   ;;
 
+  let of_string_exn = Fn.compose Or_error.ok_exn of_string
   let to_string t = t
 end
 
@@ -38,14 +39,23 @@ module Header_value = struct
            [%sexp_of: string * t])
   ;;
 
+  let of_string_exn = Fn.compose Or_error.ok_exn of_string
   let to_string t = t
 end
 
-type t = Header_value.t list Map.M(Header_key).t [@@deriving sexp]
+type t = Header_value.t list Map.M(Header_key).t [@@deriving sexp, compare]
 
 let empty = Map.empty (module Header_key)
-let insert key data t = Map.add_multi t ~key ~data
+let add key data t = Map.add_multi t ~key ~data
 let find key t = Map.find t key
+
+let add_if_missing key data t =
+  match find key t with
+  | None -> add key data t
+  | Some _ -> t
+;;
+
+let to_alist t = Map.to_alist t
 let remove key t = Map.remove t key
 let pp fmt t = Sexp.pp fmt (sexp_of_t t)
 let pp_hum fmt t = Sexp.pp_hum fmt (sexp_of_t t)

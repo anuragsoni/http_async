@@ -7,6 +7,7 @@ module Headers : sig
 
     val to_string : t -> string
     val of_string : string -> t Or_error.t
+    val of_string_exn : string -> t
   end
 
   module Header_value : sig
@@ -14,13 +15,15 @@ module Headers : sig
 
     val to_string : t -> string
     val of_string : string -> t Or_error.t
+    val of_string_exn : string -> t
   end
 
   type t [@@deriving sexp]
 
   val empty : t
-  val insert : Header_key.t -> Header_value.t -> t -> t
+  val add : Header_key.t -> Header_value.t -> t -> t
   val find : Header_key.t -> t -> Header_value.t list option
+  val add_if_missing : Header_key.t -> Header_value.t -> t -> t
   val remove : Header_key.t -> t -> t
   val pp : Format.formatter -> t -> unit
   val pp_hum : Format.formatter -> t -> unit [@@ocaml.toplevel_printer]
