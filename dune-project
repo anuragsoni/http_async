@@ -32,8 +32,7 @@
   (ppx_jane
    (>= 0.13))
   (async_ssl
-   (>= 0.13))
-  logs))
+   (>= 0.13))))
 
 (package
  (name async-http)
@@ -53,7 +52,6 @@
   httpaf
   faraday
   uri-sexp
-  logs
   magic-mime
   (async_ssl
    (>= 0.13))

@@ -13,7 +13,7 @@ module Server = struct
     let message =
       match error with
       | `Exn e ->
-        Logger.err (fun m -> m !"%{sexp: Exn.t}" e);
+        Logger.error_s ([%sexp_of: Exn.t] e);
         Status.default_reason_phrase `Internal_server_error
       | (#Status.server_error | #Status.client_error) as error ->
         Status.default_reason_phrase error

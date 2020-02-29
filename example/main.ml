@@ -30,15 +30,11 @@ let main port =
   >>= fun server ->
   Deferred.forever () (fun () ->
       Clock.after Time.Span.(of_sec 0.5)
-      >>| fun () ->
-      Logs.info (fun m -> m "connections: %d" (Tcp.Server.num_connections server)));
+      >>| fun () -> Log.Global.info "connections: %d" (Tcp.Server.num_connections server));
   Deferred.never ()
 ;;
 
 let () =
-  Fmt_tty.setup_std_outputs ();
-  Logs.set_reporter (Logs_fmt.reporter ());
-  Logs.set_level ~all:true (Some Logs.Debug);
   Command.async
     ~summary:"Sample server"
     Command.Param.(

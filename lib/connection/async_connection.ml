@@ -1,10 +1,7 @@
 open Core
 open Async
 open Async_ssl
-
-let log_src = Logs.Src.create "async_connection"
-
-module Logger = (val Logs.src_log log_src : Logs.LOG)
+module Logger = Log.Make_global ()
 
 module Server = struct
   let create_ssl handler ~crt_file ~key_file r w =
@@ -16,7 +13,7 @@ module Server = struct
       Ssl.server ~crt_file ~key_file ~net_to_ssl ~ssl_to_net ~ssl_to_app ~app_to_ssl ()
     with
     | Error e ->
-      Logger.err (fun m -> m !"%{sexp: Error.t}" e);
+      Logger.error_s ([%sexp_of: Error.t] e);
       return ()
     | Ok conn ->
       let%bind reader =
@@ -34,7 +31,7 @@ module Server = struct
         let%bind () =
           match%map Ssl.Connection.closed conn with
           | Ok _ -> ()
-          | Error e -> Logger.err (fun m -> m !"%{sexp: Error.t}" e)
+          | Error e -> Logger.error_s ([%sexp_of: Error.t] e)
         in
         Reader.close reader
       in
@@ -167,7 +164,7 @@ module Client = struct
         let%bind () =
           match%map Ssl.Connection.closed conn with
           | Ok _ -> ()
-          | Error e -> Logger.err (fun m -> m !"%{sexp: Error.t}" e)
+          | Error e -> Logger.error_s ([%sexp_of: Error.t] e)
         in
         Reader.close reader
       in
