@@ -71,12 +71,21 @@ let write_body body request_body =
   match body with
   | None -> Deferred.unit
   | Some s ->
-    Pipe.iter_without_pushback
-      ~continue_on_error:true
-      ~f:(fun { Core.Unix.IOVec.buf; pos; len } ->
-        Httpaf.Body.write_bigstring request_body ~off:pos ~len buf;
-        Httpaf.Body.flush request_body (fun () -> ()))
-      s
+    (match s with
+    | Body.Stream s ->
+      Pipe.iter_without_pushback
+        ~continue_on_error:true
+        ~f:(fun { Core.Unix.IOVec.buf; pos; len } ->
+          Httpaf.Body.write_bigstring request_body ~off:pos ~len buf;
+          Httpaf.Body.flush request_body (fun () -> ()))
+        s
+    | String s ->
+      Httpaf.Body.write_string request_body s;
+      Deferred.unit
+    | Bigstring s ->
+      Httpaf.Body.write_bigstring request_body s;
+      Deferred.unit
+    | Empty -> Deferred.unit)
 ;;
 
 let request

@@ -7,7 +7,12 @@ type iovec = Bigstring.t Unix.IOVec.t [@@deriving sexp_of]
 let iovec_to_string { Unix.IOVec.buf; pos; len } = Bigstring.to_string buf ~pos ~len
 let iovec_of_string s = Unix.IOVec.of_bigstring (Bigstring.of_string s)
 
-type content = iovec Pipe.Reader.t [@@deriving sexp_of]
+type content =
+  | Empty
+  | String of string
+  | Bigstring of bigstring
+  | Stream of iovec Pipe.Reader.t
+[@@deriving sexp_of]
 
 type t =
   { length : Int64.t option
@@ -15,28 +20,31 @@ type t =
   }
 [@@deriving sexp_of, fields]
 
-let drain { content; _ } = Pipe.drain content
+let drain { content; _ } =
+  match content with
+  | Stream content -> Pipe.drain content
+  | _ -> Deferred.unit
+;;
 
 let to_string { content; _ } =
-  let string_pipe = Pipe.map ~f:iovec_to_string content in
-  let%map segments = Pipe.to_list string_pipe in
-  String.concat segments
+  match content with
+  | Stream content ->
+    let string_pipe = Pipe.map ~f:iovec_to_string content in
+    let%map segments = Pipe.to_list string_pipe in
+    String.concat segments
+  | String s -> return s
+  | Bigstring b -> return (Bigstring.to_string b)
+  | Empty -> return ""
 ;;
 
-let of_string s =
-  { content = Pipe.singleton (Unix.IOVec.of_bigstring (Bigstring.of_string s))
-  ; length = Some (Int64.of_int (String.length s))
-  }
-;;
+let of_string s = { content = String s; length = Some (Int64.of_int (String.length s)) }
 
 let of_bigstring b =
-  { content = Pipe.singleton (Unix.IOVec.of_bigstring b)
-  ; length = Some (Int64.of_int (Bigstring.length b))
-  }
+  { content = Bigstring b; length = Some (Int64.of_int (Bigstring.length b)) }
 ;;
 
-let of_stream ?length s = { content = s; length }
-let empty = { content = Pipe.of_list []; length = Some 0L }
+let of_stream ?length s = { content = Stream s; length }
+let empty = { content = Empty; length = Some 0L }
 
 let read_httpaf_body ?length finished body =
   let on_eof' () =

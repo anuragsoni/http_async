@@ -31,7 +31,13 @@ end
 
 module Body : sig
   type iovec = Bigstring.t Core.Unix.IOVec.t [@@deriving sexp_of]
-  type content = iovec Pipe.Reader.t [@@deriving sexp_of]
+
+  type content = private
+    | Empty
+    | String of string
+    | Bigstring of bigstring
+    | Stream of iovec Pipe.Reader.t
+  [@@deriving sexp_of]
 
   type t = private
     { length : Int64.t option
