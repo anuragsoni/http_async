@@ -13,6 +13,7 @@ depends: [
   "async" {>= "0.13"}
   "ppx_jane" {>= "0.13"}
   "async_ssl" {>= "0.13"}
+  "logs"
 ]
 build: [
   ["dune" "subst"] {pinned}

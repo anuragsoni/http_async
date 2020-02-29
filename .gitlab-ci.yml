@@ -12,6 +12,7 @@ cache:
 before_script:
   - opam init --bare
   - '[ ! -d "_opam" ] && opam switch create . 4.09.0 --no-install'
+  - opam install fmt
   - opam pin add async-http.dev -n .
   - opam depext async-http
   - opam install -t . --deps-only

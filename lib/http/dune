@@ -5,4 +5,4 @@
  (preprocess
   (pps ppx_jane))
  (libraries async async_ssl core httpaf uri-sexp uri.services
-   async_connection))
+   async_connection logs))

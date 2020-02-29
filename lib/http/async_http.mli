@@ -1,6 +1,8 @@
 open Core
 open Async
 
+val log_src : Logs.src
+
 module Headers : sig
   module Header_key : sig
     type t [@@deriving sexp, compare]

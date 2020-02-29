@@ -2,4 +2,6 @@
  (names main main_client)
  (preprocess
   (pps ppx_jane))
- (libraries core async async-http async-connection))
+ (ocamlopt_flags
+  (:standard -O3))
+ (libraries core async async-http async-connection logs logs.fmt fmt.tty))

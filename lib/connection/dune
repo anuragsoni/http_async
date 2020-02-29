@@ -3,4 +3,4 @@
  (public_name async-connection)
  (preprocess
   (pps ppx_jane))
- (libraries core async async_ssl))
+ (libraries core async async_ssl logs))
