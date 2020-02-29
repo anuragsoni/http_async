@@ -1,11 +1,11 @@
 open Core
-open Async
-module Unix = Core.Unix
+open Async_kernel
 
 type iovec = Bigstring.t Unix.IOVec.t [@@deriving sexp_of]
 
 let iovec_to_string { Unix.IOVec.buf; pos; len } = Bigstring.to_string buf ~pos ~len
 let iovec_of_string s = Unix.IOVec.of_bigstring (Bigstring.of_string s)
+let iovec_of_bigstring ?pos ?len b = Unix.IOVec.of_bigstring ?pos ?len b
 
 type content =
   | Empty
@@ -37,6 +37,14 @@ let to_string { content; _ } =
   | Empty -> return ""
 ;;
 
+let to_pipe { content; _ } =
+  match content with
+  | Stream content -> content
+  | String s -> Pipe.singleton (iovec_of_string s)
+  | Bigstring b -> Pipe.singleton (iovec_of_bigstring b)
+  | Empty -> Pipe.of_list []
+;;
+
 let of_string s = { content = String s; length = Some (Int64.of_int (String.length s)) }
 
 let of_bigstring b =
@@ -53,8 +61,7 @@ let read_httpaf_body ?length finished body =
     return @@ `Finished ()
   in
   let on_read' writer b ~off ~len =
-    let module Unix = Core.Unix in
-    let%map () = Pipe.write_if_open writer (Unix.IOVec.of_bigstring ~pos:off ~len b) in
+    let%map () = Pipe.write_if_open writer (iovec_of_bigstring ~pos:off ~len b) in
     `Repeat ()
   in
   let b =

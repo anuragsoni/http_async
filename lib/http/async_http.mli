@@ -21,10 +21,12 @@ module Headers : sig
   type t [@@deriving sexp]
 
   val empty : t
+  val of_list : (Header_key.t * Header_value.t) list -> t
   val add : Header_key.t -> Header_value.t -> t -> t
   val find : Header_key.t -> t -> Header_value.t list option
   val add_if_missing : Header_key.t -> Header_value.t -> t -> t
   val remove : Header_key.t -> t -> t
+  val content_length : Int64.t -> Header_key.t * Header_value.t
   val pp : Format.formatter -> t -> unit
   val pp_hum : Format.formatter -> t -> unit [@@ocaml.toplevel_printer]
 end
@@ -47,6 +49,7 @@ module Body : sig
 
   val drain : t -> unit Deferred.t
   val to_string : t -> string Deferred.t
+  val to_pipe : t -> iovec Pipe.Reader.t
   val empty : t
   val of_string : string -> t
   val of_bigstring : Bigstring.t -> t

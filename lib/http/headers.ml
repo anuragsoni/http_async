@@ -46,6 +46,7 @@ end
 type t = Header_value.t list Map.M(Header_key).t [@@deriving sexp, compare]
 
 let empty = Map.empty (module Header_key)
+let of_list xs = Map.of_alist_multi (module Header_key) xs
 let add key data t = Map.add_multi t ~key ~data
 let find key t = Map.find t key
 
@@ -59,3 +60,8 @@ let to_alist t = Map.to_alist t
 let remove key t = Map.remove t key
 let pp fmt t = Sexp.pp fmt (sexp_of_t t)
 let pp_hum fmt t = Sexp.pp_hum fmt (sexp_of_t t)
+
+let content_length len =
+  ( Header_key.of_string_exn "content-length"
+  , Header_value.of_string_exn (Int64.to_string len) )
+;;
