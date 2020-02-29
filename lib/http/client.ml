@@ -115,6 +115,18 @@ let request
     in
     let finished = Ivar.create () in
     let resp = Ivar.create () in
+    let err_iv = Ivar.create () in
+    let error_handler err =
+      let e =
+        match err with
+        | `Malformed_response msg ->
+          Or_error.error_s [%message "Malformed response" ~message:msg]
+        | `Invalid_response_body_length _resp ->
+          Or_error.error_s [%message "Invalid response body length"]
+        | `Exn exn -> Or_error.of_exn exn
+      in
+      Ivar.fill err_iv e
+    in
     don't_wait_for
       (Async_connection.Client.with_connection
          mode
@@ -123,7 +135,7 @@ let request
            let request_body =
              Protocol.Client.request
                ~response_handler:(response_handler meth resp finished)
-               ~error_handler:(fun _ -> assert false)
+               ~error_handler
                request
                reader
                writer
@@ -131,7 +143,7 @@ let request
            let%bind () = write_body (Option.map ~f:Body.content body) request_body in
            Httpaf.Body.close_writer request_body;
            Ivar.read finished));
-    Ivar.read resp
+    Deferred.any [ Ivar.read resp; Ivar.read err_iv ]
 ;;
 
 let get ?ssl_options ?headers uri = request ?ssl_options ?headers `GET uri

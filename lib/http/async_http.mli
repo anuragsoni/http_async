@@ -56,6 +56,31 @@ module Body : sig
   val of_stream : ?length:Int64.t -> iovec Pipe.Reader.t -> t
 end
 
+module Request : sig
+  type t = private
+    { target : string
+    ; state : Univ_map.t
+    ; headers : Headers.t
+    ; body : Body.t
+    ; meth : Httpaf.Method.t
+    }
+  [@@deriving sexp_of, fields]
+
+  val make : ?headers:Headers.t -> ?body:Body.t -> Httpaf.Method.t -> string -> t
+end
+
+module Response : sig
+  type t =
+    { status : Httpaf.Status.t
+    ; headers : Headers.t
+    ; body : Body.t
+    ; state : Univ_map.t
+    }
+  [@@deriving sexp_of]
+
+  val make : ?headers:Headers.t -> ?body:Body.t -> Httpaf.Status.t -> t
+end
+
 module Server : sig
   val create_connection_handler
     :  ?config:Httpaf.Config.t
