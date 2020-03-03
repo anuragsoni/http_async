@@ -11,8 +11,9 @@ let create_connection_handler service =
       | `Fixed l -> Some l
       | `Error _ -> Error.raise_s [%message "Bad request"]
     in
-    let body_read = Ivar.create () in
-    let body = Body.read_httpaf_body ?length body_read req_body in
+    let body =
+      Body.read_httpaf_body ?length (fun () -> Httpaf.Body.close_reader req_body) req_body
+    in
     let write_fixed_response ~headers f status body =
       let headers = Httpaf_http.headers_to_httpaf_headers headers in
       f reqd (Httpaf.Response.create ~headers status) body;
@@ -22,9 +23,7 @@ let create_connection_handler service =
     | Error e -> Error.raise e
     | Ok request ->
       don't_wait_for
-        (Ivar.read body_read
-        >>= fun () ->
-        service request
+        (service request
         >>= function
         | Error err -> Error.raise err
         | Ok { Response.body; headers; status; _ } ->

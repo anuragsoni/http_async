@@ -63,7 +63,14 @@ let response_handler request_method resp finished response response_body =
     | `Fixed l -> Some l
     | _ -> None
   in
-  let body = Body.read_httpaf_body ?length finished response_body in
+  let body =
+    Body.read_httpaf_body
+      ?length
+      (fun () ->
+        Ivar.fill finished ();
+        Httpaf.Body.close_reader response_body)
+      response_body
+  in
   Ivar.fill resp (Httpaf_http.httpaf_response_to_response response body)
 ;;
 

@@ -54,10 +54,12 @@ let of_bigstring b =
 let of_stream ?length s = { content = Stream s; length }
 let empty = { content = Empty; length = Some 0L }
 
-let read_httpaf_body ?length finished body =
+let read_httpaf_body ?length on_finish body =
   let on_eof' () =
-    Httpaf.Body.close_reader body;
-    Ivar.fill finished ();
+    on_finish ();
+    (* Httpaf.Body.close_reader body; *)
+
+    (* Ivar.fill finished (); *)
     return @@ `Finished ()
   in
   let on_read' writer b ~off ~len =
