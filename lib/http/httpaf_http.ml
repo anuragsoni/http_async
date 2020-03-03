@@ -55,3 +55,11 @@ let%test_unit "convert from Headers to Httpaf Headers and back" =
   let m' = Map.of_alist_multi (module String) (Httpaf.Headers.to_list h') in
   [%test_result: string list Map.M(String).t] ~expect:m m'
 ;;
+
+let httpaf_response_to_response resp body =
+  let headers = resp.Httpaf.Response.headers in
+  let status = resp.Httpaf.Response.status in
+  match httpaf_headers_to_headers headers with
+  | Error _ as e -> e
+  | Ok headers -> Or_error.return (Response.make ~headers ~body status)
+;;

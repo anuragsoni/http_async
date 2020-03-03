@@ -99,18 +99,18 @@ module Client : sig
     -> ?body:Body.t
     -> Httpaf.Method.standard
     -> Uri.t
-    -> (Httpaf.Response.t * Body.t) Deferred.Or_error.t
+    -> Response.t Deferred.Or_error.t
 
   val get
     :  ?ssl_options:Async_connection.Client.ssl_options
     -> ?headers:Httpaf.Headers.t
     -> Uri.t
-    -> (Httpaf.Response.t * Body.t) Deferred.Or_error.t
+    -> Response.t Deferred.Or_error.t
 
   val post
     :  ?ssl_options:Async_connection.Client.ssl_options
     -> ?headers:Httpaf.Headers.t
     -> ?body:Body.t
     -> Uri.t
-    -> (Httpaf.Response.t * Body.t) Deferred.Or_error.t
+    -> Response.t Deferred.Or_error.t
 end

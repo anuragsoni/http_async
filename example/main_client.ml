@@ -4,11 +4,12 @@ open Async
 let uri = Uri.of_string "https://httpbin.org/post"
 
 let main () =
+  let open Async_http in
   match%bind Async_http.Client.post ~body:(Async_http.Body.of_string "hello") uri with
   | Error err ->
     Log.Global.error "Error happened";
     Deferred.Result.fail err
-  | Ok (_response, body) ->
+  | Ok { Response.body; _ } ->
     Async_http.Body.to_string body
     >>= fun word ->
     print_endline word;

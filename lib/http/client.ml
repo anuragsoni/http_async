@@ -64,7 +64,7 @@ let response_handler request_method resp finished response response_body =
     | _ -> None
   in
   let body = Body.read_httpaf_body ?length finished response_body in
-  Ivar.fill resp (Or_error.return (response, body))
+  Ivar.fill resp (Httpaf_http.httpaf_response_to_response response body)
 ;;
 
 let write_body body request_body =
