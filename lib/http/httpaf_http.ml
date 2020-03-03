@@ -63,3 +63,11 @@ let httpaf_response_to_response resp body =
   | Error _ as e -> e
   | Ok headers -> Or_error.return (Response.make ~headers ~body status)
 ;;
+
+let httpaf_request_to_request ?body req =
+  let headers = req.Httpaf.Request.headers in
+  let meth = req.meth in
+  match httpaf_headers_to_headers headers with
+  | Error _ as e -> e
+  | Ok headers -> Or_error.return (Request.make ~headers ?body meth req.target)
+;;

@@ -1,32 +1,25 @@
 open Core
 open Async
 
-let request_handler =
+let handler _req =
+  let open Async_http in
   let headers =
-    Httpaf.Headers.of_list
-      [ "content-length", Int.to_string (Bigstring.length Test_data.text) ]
+    Headers.of_list
+      [ Headers.content_length (Bigstring.length Test_data.text |> Int.to_int64) ]
   in
-  let handler reqd =
-    let request_body = Httpaf.Reqd.request_body reqd in
-    Httpaf.Body.close_reader request_body;
-    Httpaf.Reqd.respond_with_bigstring
-      reqd
-      (Httpaf.Response.create ~headers `OK)
-      Test_data.text
-  in
-  handler
+  let response = Response.make ~headers ~body:(Body.of_bigstring Test_data.text) `OK in
+  Deferred.Or_error.return response
 ;;
 
 let main port =
   let where_to_listen = Tcp.Where_to_listen.of_port port in
-  let request_handler _conn = request_handler in
   Async_connection.(
     Server.create
-      ~crt_file:"./certs/localhost.pem"
-      ~key_file:"./certs/localhost.key"
+    (* ~crt_file:"./certs/localhost.pem" *)
+    (* ~key_file:"./certs/localhost.key" *)
       ~on_handler_error:`Ignore
       where_to_listen)
-    (Async_http.Server.create_connection_handler ~request_handler)
+    (Async_http.Server.create_connection_handler handler)
   >>= fun server ->
   Deferred.forever () (fun () ->
       Clock.after Time.Span.(of_sec 0.5)

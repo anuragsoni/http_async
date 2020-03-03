@@ -26,8 +26,8 @@ module Server = struct
   ;;
 
   let create_connection_handler
-      ?config
       ~request_handler
+      ?config
       ?(error_handler = default_error_handler)
       addr
       reader

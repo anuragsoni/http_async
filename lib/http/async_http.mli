@@ -81,10 +81,14 @@ module Response : sig
   val make : ?headers:Headers.t -> ?body:Body.t -> Httpaf.Status.t -> t
 end
 
+module Service : sig
+  type t = Request.t -> Response.t Deferred.Or_error.t
+end
+
 module Server : sig
   val create_connection_handler
-    :  ?config:Httpaf.Config.t
-    -> request_handler:('a -> Httpaf.Server_connection.request_handler)
+    :  Service.t
+    -> ?config:Httpaf.Config.t
     -> ?error_handler:Httpaf.Server_connection.error_handler
     -> 'a
     -> Reader.t
