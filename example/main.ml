@@ -3,11 +3,7 @@ open Async
 
 let handler _req =
   let open Async_http in
-  let headers =
-    Headers.of_list
-      [ Headers.content_length (Bigstring.length Test_data.text |> Int.to_int64) ]
-  in
-  let response = Response.make ~headers ~body:(Body.of_bigstring Test_data.text) `OK in
+  let response = Response.make ~body:(Body.of_bigstring Test_data.text) `OK in
   Deferred.Or_error.return response
 ;;
 

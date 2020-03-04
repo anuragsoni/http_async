@@ -2,31 +2,14 @@ open Core
 open Async
 
 module Headers : sig
-  module Header_key : sig
-    type t [@@deriving sexp, compare]
-
-    val to_string : t -> string
-    val of_string : string -> t Or_error.t
-    val of_string_exn : string -> t
-  end
-
-  module Header_value : sig
-    type t [@@deriving sexp, compare]
-
-    val to_string : t -> string
-    val of_string : string -> t Or_error.t
-    val of_string_exn : string -> t
-  end
-
   type t [@@deriving sexp]
 
   val empty : t
-  val of_list : (Header_key.t * Header_value.t) list -> t
-  val add : Header_key.t -> Header_value.t -> t -> t
-  val find : Header_key.t -> t -> Header_value.t list option
-  val add_if_missing : Header_key.t -> Header_value.t -> t -> t
-  val remove : Header_key.t -> t -> t
-  val content_length : Int64.t -> Header_key.t * Header_value.t
+  val of_list : (string * string) list -> t
+  val add : string -> string -> t -> t
+  val find : string -> t -> string list option
+  val add_if_missing : string -> string -> t -> t
+  val remove : string -> t -> t
   val pp : Format.formatter -> t -> unit
   val pp_hum : Format.formatter -> t -> unit [@@ocaml.toplevel_printer]
 end
@@ -50,10 +33,12 @@ module Body : sig
   val drain : t -> unit Deferred.t
   val to_string : t -> string Deferred.t
   val to_pipe : t -> iovec Pipe.Reader.t
+  val to_string_pipe : t -> string Pipe.Reader.t
   val empty : t
   val of_string : string -> t
   val of_bigstring : Bigstring.t -> t
-  val of_stream : ?length:Int64.t -> iovec Pipe.Reader.t -> t
+  val of_pipe : ?length:Int64.t -> iovec Pipe.Reader.t -> t
+  val of_string_pipe : ?length:Int64.t -> string Pipe.Reader.t -> t
 end
 
 module Request : sig

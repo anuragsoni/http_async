@@ -1,16 +1,8 @@
-open Base
+open Core_kernel
 
 let httpaf_headers_to_headers headers =
   Httpaf.Headers.to_list headers
-  |> List.map ~f:(fun (key, data) ->
-         let open Or_error.Let_syntax in
-         let%map key = Headers.Header_key.of_string key
-         and data = Headers.Header_value.of_string data in
-         key, data)
-  |> Or_error.combine_errors
-  |> Or_error.map ~f:(fun hs ->
-         List.fold hs ~init:Headers.empty ~f:(fun acc (key, data) ->
-             Headers.add key data acc))
+  |> List.fold ~init:Headers.empty ~f:(fun acc (key, data) -> Headers.add key data acc)
 ;;
 
 let%test_unit "convert httpaf headers to Headers" =
@@ -18,24 +10,14 @@ let%test_unit "convert httpaf headers to Headers" =
   let httpaf_headers = Httpaf.Headers.of_list h in
   let headers = httpaf_headers_to_headers httpaf_headers in
   let expect =
-    Ok
-      (List.fold h ~init:Headers.empty ~f:(fun acc (k, v) ->
-           Headers.add
-             (Headers.Header_key.of_string_exn k)
-             (Headers.Header_value.of_string_exn v)
-             acc))
+    List.fold h ~init:Headers.empty ~f:(fun acc (k, v) -> Headers.add k v acc)
   in
-  [%test_result: Headers.t Or_error.t] headers ~expect;
-  let httpaf_headers = Httpaf.Headers.of_list (("foo\129", "bba") :: h) in
-  let headers = httpaf_headers_to_headers httpaf_headers in
-  [%test_result: bool] (headers |> Or_error.is_error) ~expect:true
+  [%test_result: Headers.t] headers ~expect
 ;;
 
 let headers_to_httpaf_headers headers =
   Map.fold headers ~init:Httpaf.Headers.empty ~f:(fun ~key ~data acc ->
-      let key = Headers.Header_key.to_string key in
-      List.fold data ~init:acc ~f:(fun acc v ->
-          Httpaf.Headers.add acc key (Headers.Header_value.to_string v)))
+      List.fold data ~init:acc ~f:(fun acc v -> Httpaf.Headers.add acc key v))
 ;;
 
 let%test_unit "convert from Headers to Httpaf Headers and back" =
@@ -43,31 +25,25 @@ let%test_unit "convert from Headers to Httpaf Headers and back" =
     [ "foo", "bar"; "AB", "pqr"; "hello", "world"; "foo", "baz"; "Hello", "world" ]
   in
   let m =
-    List.fold
-      headers
-      ~init:(Map.empty (module String))
-      ~f:(fun acc (k, v) ->
-        let k = String.lowercase k in
+    List.fold headers ~init:String.Caseless.Map.empty ~f:(fun acc (k, v) ->
         Map.add_multi acc ~key:k ~data:v)
   in
-  let h = httpaf_headers_to_headers (Httpaf.Headers.of_list headers) |> Or_error.ok_exn in
+  let h = httpaf_headers_to_headers (Httpaf.Headers.of_list headers) in
   let h' = headers_to_httpaf_headers h in
-  let m' = Map.of_alist_multi (module String) (Httpaf.Headers.to_list h') in
-  [%test_result: string list Map.M(String).t] ~expect:m m'
+  let m' = String.Caseless.Map.of_alist_multi (Httpaf.Headers.to_list h') in
+  [%test_result: string list String.Caseless.Map.t] ~expect:m m'
 ;;
 
 let httpaf_response_to_response resp body =
   let headers = resp.Httpaf.Response.headers in
   let status = resp.Httpaf.Response.status in
-  match httpaf_headers_to_headers headers with
-  | Error _ as e -> e
-  | Ok headers -> Or_error.return (Response.make ~headers ~body status)
+  let headers = httpaf_headers_to_headers headers in
+  Response.make ~headers ~body status
 ;;
 
 let httpaf_request_to_request ?body req =
   let headers = req.Httpaf.Request.headers in
   let meth = req.meth in
-  match httpaf_headers_to_headers headers with
-  | Error _ as e -> e
-  | Ok headers -> Or_error.return (Request.make ~headers ?body meth req.target)
+  let headers = httpaf_headers_to_headers headers in
+  Request.make ~headers ?body meth req.target
 ;;

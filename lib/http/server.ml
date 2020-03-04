@@ -19,35 +19,39 @@ let create_connection_handler service =
       f reqd (Httpaf.Response.create ~headers status) body;
       Deferred.unit
     in
-    match Httpaf_http.httpaf_request_to_request ~body req with
-    | Error e -> Error.raise e
-    | Ok request ->
-      don't_wait_for
-        (service request
-        >>= function
-        | Error err -> Error.raise err
-        | Ok { Response.body; headers; status; _ } ->
-          (match body.content with
-          | Body.Empty ->
-            write_fixed_response ~headers Httpaf.Reqd.respond_with_string status ""
-          | String s ->
-            write_fixed_response ~headers Httpaf.Reqd.respond_with_string status s
-          | Bigstring b ->
-            write_fixed_response ~headers Httpaf.Reqd.respond_with_bigstring status b
-          | Stream s ->
-            let rb =
-              Httpaf.Reqd.respond_with_streaming
-                reqd
-                (Httpaf.Response.create
-                   ~headers:(Httpaf_http.headers_to_httpaf_headers headers)
-                   status)
-            in
-            Pipe.iter_without_pushback
-              s
-              ~continue_on_error:true
-              ~f:(fun { Core.Unix.IOVec.buf; pos; len } ->
-                Httpaf.Body.write_bigstring rb ~off:pos ~len buf)
-            >>| fun () -> Httpaf.Body.flush rb (fun () -> Httpaf.Body.close_writer rb)))
+    let request = Httpaf_http.httpaf_request_to_request ~body req in
+    don't_wait_for
+      (service request
+      >>= function
+      | Error err -> Error.raise err
+      | Ok { Response.body; headers; status; _ } ->
+        let { Body.content; length } = body in
+        let headers =
+          match length with
+          | None -> Headers.add_if_missing "transfer-encoding" "chunked" headers
+          | Some l -> Headers.add_if_missing "content-length" (Int64.to_string l) headers
+        in
+        (match content with
+        | Body.Empty ->
+          write_fixed_response ~headers Httpaf.Reqd.respond_with_string status ""
+        | String s ->
+          write_fixed_response ~headers Httpaf.Reqd.respond_with_string status s
+        | Bigstring b ->
+          write_fixed_response ~headers Httpaf.Reqd.respond_with_bigstring status b
+        | Stream s ->
+          let rb =
+            Httpaf.Reqd.respond_with_streaming
+              reqd
+              (Httpaf.Response.create
+                 ~headers:(Httpaf_http.headers_to_httpaf_headers headers)
+                 status)
+          in
+          Pipe.iter_without_pushback
+            s
+            ~continue_on_error:true
+            ~f:(fun { Core.Unix.IOVec.buf; pos; len } ->
+              Httpaf.Body.write_bigstring rb ~off:pos ~len buf)
+          >>| fun () -> Httpaf.Body.flush rb (fun () -> Httpaf.Body.close_writer rb)))
   in
   Protocol.Server.create_connection_handler ~request_handler
 ;;

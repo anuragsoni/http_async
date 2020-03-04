@@ -45,13 +45,22 @@ let to_pipe { content; _ } =
   | Empty -> Pipe.of_list []
 ;;
 
+let to_string_pipe { content; _ } =
+  match content with
+  | Stream content -> Pipe.map content ~f:iovec_to_string
+  | String s -> Pipe.singleton s
+  | Bigstring b -> Pipe.singleton (Bigstring.to_string b)
+  | Empty -> Pipe.of_list []
+;;
+
 let of_string s = { content = String s; length = Some (Int64.of_int (String.length s)) }
 
 let of_bigstring b =
   { content = Bigstring b; length = Some (Int64.of_int (Bigstring.length b)) }
 ;;
 
-let of_stream ?length s = { content = Stream s; length }
+let of_pipe ?length s = { content = Stream s; length }
+let of_string_pipe ?length s = of_pipe ?length (Pipe.map s ~f:iovec_of_string)
 let empty = { content = Empty; length = Some 0L }
 
 let read_httpaf_body ?length on_finish body =
@@ -77,12 +86,14 @@ let read_httpaf_body ?length on_finish body =
             let on_eof () =
               don't_wait_for (on_eof' () >>| fun n -> Ivar.fill next_iter n)
             in
-            let on_read buffer ~off ~len =
+            let on_read buf ~off ~len =
+              let buffer = Bigstring.create len in
+              Bigstring.blit ~src:buf ~src_pos:off ~len ~dst:buffer ~dst_pos:0;
               don't_wait_for
                 (on_read' writer buffer ~off ~len >>| fun n -> Ivar.fill next_iter n)
             in
             Httpaf.Body.schedule_read body ~on_eof ~on_read;
             Ivar.read next_iter))
   in
-  of_stream ?length b
+  of_pipe ?length b
 ;;

@@ -71,7 +71,7 @@ let response_handler request_method resp finished response response_body =
         Httpaf.Body.close_reader response_body)
       response_body
   in
-  Ivar.fill resp (Httpaf_http.httpaf_response_to_response response body)
+  Ivar.fill resp (Ok (Httpaf_http.httpaf_response_to_response response body))
 ;;
 
 let write_body body request_body =
