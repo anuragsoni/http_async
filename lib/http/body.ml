@@ -66,9 +66,6 @@ let empty = { content = Empty; length = Some 0L }
 let read_httpaf_body ?length on_finish body =
   let on_eof' () =
     on_finish ();
-    (* Httpaf.Body.close_reader body; *)
-
-    (* Ivar.fill finished (); *)
     return @@ `Finished ()
   in
   let on_read' writer b ~off ~len =
