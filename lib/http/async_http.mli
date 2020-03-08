@@ -67,7 +67,7 @@ module Response : sig
 end
 
 module Service : sig
-  type t = Request.t -> Response.t Deferred.Or_error.t
+  type t = Request.t -> Response.t Deferred.t
 end
 
 module Server : sig

@@ -4,7 +4,7 @@ open Async
 let handler _req =
   let open Async_http in
   let response = Response.make ~body:(Body.of_bigstring Test_data.text) `OK in
-  Deferred.Or_error.return response
+  return response
 ;;
 
 let main port =

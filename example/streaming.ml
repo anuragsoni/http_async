@@ -10,7 +10,7 @@ let handler req =
         Pipe.transfer pipe writer ~f:String.uppercase)
   in
   let response = Response.make ~body:(Body.of_string_pipe ?length response_body) `OK in
-  Deferred.Or_error.return response
+  return response
 ;;
 
 let main port =
