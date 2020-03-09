@@ -97,7 +97,7 @@ let write_body body request_body =
 
 let request
     ?(ssl_options = Async_connection.Client.create_ssl_options ())
-    ?(headers = Httpaf.Headers.empty)
+    ?(headers = Headers.empty)
     ?body
     meth
     uri
@@ -106,7 +106,10 @@ let request
   | Error err -> Deferred.Or_error.fail err
   | Ok (mode, host_and_port) ->
     let headers =
-      Httpaf.Headers.add_unless_exists headers "Host" (Host_and_port.host host_and_port)
+      Httpaf.Headers.add_unless_exists
+        (Httpaf_http.headers_to_httpaf_headers headers)
+        "Host"
+        (Host_and_port.host host_and_port)
     in
     let headers =
       match body with

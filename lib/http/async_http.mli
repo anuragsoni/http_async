@@ -84,7 +84,7 @@ end
 module Client : sig
   val request
     :  ?ssl_options:Async_connection.Client.ssl_options
-    -> ?headers:Httpaf.Headers.t
+    -> ?headers:Headers.t
     -> ?body:Body.t
     -> Httpaf.Method.standard
     -> Uri.t
@@ -92,13 +92,13 @@ module Client : sig
 
   val get
     :  ?ssl_options:Async_connection.Client.ssl_options
-    -> ?headers:Httpaf.Headers.t
+    -> ?headers:Headers.t
     -> Uri.t
     -> Response.t Deferred.Or_error.t
 
   val post
     :  ?ssl_options:Async_connection.Client.ssl_options
-    -> ?headers:Httpaf.Headers.t
+    -> ?headers:Headers.t
     -> ?body:Body.t
     -> Uri.t
     -> Response.t Deferred.Or_error.t
