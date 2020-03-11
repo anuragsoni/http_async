@@ -19,17 +19,19 @@ let handler req =
     Response.of_string (sprintf "Hello, %s" name)
   | [ ""; "file" ] -> Response.of_file "./test/sample.html"
   | [ ""; "stream" ] ->
+    (* In a real application this is where one can check if the client request
+       is using the appropriate HTTP method. *)
     let body = req.Request.body in
     (* [length] can be empty if the request transfer encoding was chunked and no
        actual length was provided in the header. *)
-    let length, pipe = Body.length body, Body.to_string_pipe body in
+    let length, pipe = Body.length body, Body.to_pipe body in
     (* We can use any of the async pipe utilities to create a streaming response
        body. *)
     let response_body =
       Pipe.create_reader ~close_on_exception:true (fun writer ->
           Pipe.transfer pipe writer ~f:String.uppercase)
     in
-    return (Response.make ~body:(Body.of_string_pipe ?length response_body) `OK)
+    return (Response.make ~body:(Body.of_pipe ?length response_body) `OK)
   | _ -> Response.of_string ~status:`Not_found "Route not found"
 ;;
 ```
