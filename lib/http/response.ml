@@ -35,22 +35,7 @@ let of_file ?(headers = Headers.empty) ?(status = `OK) name =
         let size = Async_unix.Unix.Stats.size stat in
         let mime = Magic_mime.lookup name in
         let headers = Headers.add_if_missing "content-type" mime headers in
-        let w writer =
-          match%map
-            Reader.read_one_chunk_at_a_time reader ~handle_chunk:(fun chunk ~pos ~len ->
-                let%map () =
-                  Pipe.write_if_open writer (Unix.IOVec.of_bigstring chunk ~pos ~len)
-                in
-                `Consumed (len, `Need_unknown))
-          with
-          | `Stopped () -> assert false
-          | `Eof_with_unconsumed_data d ->
-            let d' = Bigstring.of_string d in
-            Pipe.write_without_pushback_if_open writer (Unix.IOVec.of_bigstring d')
-          | `Eof -> ()
-        in
-        let reader_pipe = Pipe.create_reader ~close_on_exception:false w in
-        upon (Pipe.closed reader_pipe) (fun () -> don't_wait_for (Reader.close reader));
+        let reader_pipe = Reader.pipe reader in
         let body = Body.of_pipe ~length:size reader_pipe in
         return (make ~headers ~body status)
       | _ -> Error.raise (Error.of_thunk (fun () -> "Not a file")))

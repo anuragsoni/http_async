@@ -43,11 +43,8 @@ let create_connection_handler service =
                ~headers:(Httpaf_http.headers_to_httpaf_headers headers)
                status)
         in
-        Pipe.iter_without_pushback
-          s
-          ~continue_on_error:true
-          ~f:(fun { Core.Unix.IOVec.buf; pos; len } ->
-            Httpaf.Body.write_bigstring rb ~off:pos ~len buf)
+        Pipe.iter_without_pushback s ~continue_on_error:true ~f:(fun w ->
+            Httpaf.Body.write_string rb w)
         >>| fun () -> Httpaf.Body.flush rb (fun () -> Httpaf.Body.close_writer rb))
   in
   Protocol.Server.create_connection_handler ~request_handler

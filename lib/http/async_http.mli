@@ -15,30 +15,16 @@ module Headers : sig
 end
 
 module Body : sig
-  type iovec = Bigstring.t Core.Unix.IOVec.t [@@deriving sexp_of]
+  type t [@@deriving sexp_of]
 
-  type content = private
-    | Empty
-    | String of string
-    | Bigstring of bigstring
-    | Stream of iovec Pipe.Reader.t
-  [@@deriving sexp_of]
-
-  type t = private
-    { length : Int64.t option
-    ; content : content
-    }
-  [@@deriving sexp_of, fields]
-
+  val length : t -> Int64.t option
   val drain : t -> unit Deferred.t
   val to_string : t -> string Deferred.t
-  val to_pipe : t -> iovec Pipe.Reader.t
-  val to_string_pipe : t -> string Pipe.Reader.t
+  val to_pipe : t -> string Pipe.Reader.t
   val empty : t
   val of_string : string -> t
   val of_bigstring : Bigstring.t -> t
-  val of_pipe : ?length:Int64.t -> iovec Pipe.Reader.t -> t
-  val of_string_pipe : ?length:Int64.t -> string Pipe.Reader.t -> t
+  val of_pipe : ?length:Int64.t -> string Pipe.Reader.t -> t
 end
 
 module Request : sig

@@ -82,9 +82,7 @@ let write_body body request_body =
     | Body.Stream s ->
       Pipe.iter_without_pushback
         ~continue_on_error:true
-        ~f:(fun { Core.Unix.IOVec.buf; pos; len } ->
-          Httpaf.Body.write_bigstring request_body ~off:pos ~len buf;
-          Httpaf.Body.flush request_body (fun () -> ()))
+        ~f:(fun w -> Httpaf.Body.write_string request_body w)
         s
     | String s ->
       Httpaf.Body.write_string request_body s;
@@ -151,7 +149,8 @@ let request
                writer
            in
            let%bind () = write_body (Option.map ~f:Body.content body) request_body in
-           Httpaf.Body.close_writer request_body;
+           Httpaf.Body.flush request_body (fun () ->
+               Httpaf.Body.close_writer request_body);
            Ivar.read finished));
     Deferred.any [ Ivar.read resp; Ivar.read err_iv ]
 ;;
