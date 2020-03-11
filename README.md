@@ -2,7 +2,7 @@
 
 This is very much a Work in progress, and is far from usable. Async based http toolkit built around httpaf.
 
-Server examples:
+Server:
 
 ```ocaml
 open Core
@@ -33,5 +33,32 @@ let handler req =
     in
     return (Response.make ~body:(Body.of_pipe ?length response_body) `OK)
   | _ -> Response.of_string ~status:`Not_found "Route not found"
+;;
+```
+
+Client:
+
+```ocaml
+open Core
+open Async
+open Async_http
+
+let uri = Uri.of_string "https://httpbin.org/post"
+
+let post =
+  let open Async_http in
+  match%bind
+    Async_http.Client.post
+      ~body:(Async_http.Body.of_string "Hello World")
+      uri
+  with
+  | Error err ->
+    Log.Global.error "Error happened";
+    Deferred.Result.fail err
+  | Ok { Response.body; _ } ->
+    Async_http.Body.to_pipe body
+    |> Pipe.iter_without_pushback ~continue_on_error:true ~f:(fun w ->
+           Log.Global.printf "%s" w)
+    >>= fun () -> Deferred.Or_error.ok_unit
 ;;
 ```

@@ -2,7 +2,7 @@ open Core
 open Async
 
 let uri = Uri.of_string "https://httpbin.org/post"
-let request_body () = Pipe.of_list [ "Hello" ]
+let request_body () = Pipe.singleton "Hello"
 
 let main () =
   let open Async_http in
@@ -15,10 +15,10 @@ let main () =
     Log.Global.error "Error happened";
     Deferred.Result.fail err
   | Ok { Response.body; _ } ->
-    Async_http.Body.to_string body
-    >>= fun word ->
-    print_endline word;
-    Deferred.Or_error.ok_unit
+    Async_http.Body.to_pipe body
+    |> Pipe.iter_without_pushback ~continue_on_error:true ~f:(fun w ->
+           Log.Global.printf "%s" w)
+    >>= fun () -> Deferred.Or_error.ok_unit
 ;;
 
 let () =
