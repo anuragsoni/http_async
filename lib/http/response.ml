@@ -49,9 +49,9 @@ let of_file ?(headers = Headers.empty) ?(status = `OK) name =
             Pipe.write_without_pushback_if_open writer (Unix.IOVec.of_bigstring d')
           | `Eof -> ()
         in
-        let body =
-          Body.of_pipe ~length:size (Pipe.create_reader ~close_on_exception:false w)
-        in
+        let reader_pipe = Pipe.create_reader ~close_on_exception:false w in
+        upon (Pipe.closed reader_pipe) (fun () -> don't_wait_for (Reader.close reader));
+        let body = Body.of_pipe ~length:size reader_pipe in
         return (make ~headers ~body status)
       | _ -> Error.raise (Error.of_thunk (fun () -> "Not a file")))
   >>= function
