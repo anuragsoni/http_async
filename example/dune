@@ -1,5 +1,5 @@
 (executables
- (names main main_client streaming)
+ (names main main_client)
  (preprocess
   (pps ppx_jane))
  (ocamlopt_flags

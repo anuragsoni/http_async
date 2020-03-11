@@ -8,26 +8,28 @@ Server examples:
 open Core
 open Async
 
-(* Simple handle that responds with a string *)
-let handler _req =
+(* The pattern matching on path segments is done to keep the example simple.
+   In a real application one can use a routing library like [ocaml-dispatch]. *)
+let handler req =
   let open Async_http in
-  let response = Response.make ~body:(Body.of_string "Hello World") `OK in
-  return response
-;;
-
-let streaming_handler req =
-  let open Async_http in
-  let body = req.Request.body in
-  (* [length] can be empty if the request transfer encoding was chunked and no
-     actual length was provided in the header. *)
-  let length, pipe = Body.length body, Body.to_string_pipe body in
-  (* We can use any of the async pipe utilities to create a streaming response
-     body. *)
-  let response_body =
-    Pipe.create_reader ~close_on_exception:true (fun writer ->
-        Pipe.transfer pipe writer ~f:String.uppercase)
-  in
-  let response = Response.make ~body:(Body.of_string_pipe ?length response_body) `OK in
-  return response
+  match String.split ~on:'/' req.Request.target with
+  | [ ""; "hello" ] -> Response.of_string "Hello World!"
+  | [ ""; "bigstring" ] -> Response.of_bigstring Test_data.text
+  | [ ""; "greet"; name ] when String.length name > 0 ->
+    Response.of_string (sprintf "Hello, %s" name)
+  | [ ""; "file" ] -> Response.of_file "./test/sample.html"
+  | [ ""; "stream" ] ->
+    let body = req.Request.body in
+    (* [length] can be empty if the request transfer encoding was chunked and no
+       actual length was provided in the header. *)
+    let length, pipe = Body.length body, Body.to_string_pipe body in
+    (* We can use any of the async pipe utilities to create a streaming response
+       body. *)
+    let response_body =
+      Pipe.create_reader ~close_on_exception:true (fun writer ->
+          Pipe.transfer pipe writer ~f:String.uppercase)
+    in
+    return (Response.make ~body:(Body.of_string_pipe ?length response_body) `OK)
+  | _ -> Response.of_string ~status:`Not_found "Route not found"
 ;;
 ```

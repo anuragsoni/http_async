@@ -64,6 +64,19 @@ module Response : sig
   [@@deriving sexp_of]
 
   val make : ?headers:Headers.t -> ?body:Body.t -> Httpaf.Status.t -> t
+  val of_string : ?headers:Headers.t -> ?status:Httpaf.Status.t -> string -> t Deferred.t
+
+  val of_bigstring
+    :  ?headers:Headers.t
+    -> ?status:Httpaf.Status.t
+    -> Bigstring.t
+    -> t Deferred.t
+
+  val of_file
+    :  ?headers:Headers.t
+    -> ?status:Httpaf.Status.t
+    -> Filename.t
+    -> t Deferred.t
 end
 
 module Service : sig
