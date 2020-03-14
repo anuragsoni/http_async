@@ -41,28 +41,21 @@ module Request : sig
 end
 
 module Response : sig
-  type t =
+  type t = private
     { status : Httpaf.Status.t
     ; headers : Headers.t
     ; body : Body.t
     ; state : Univ_map.t
     }
-  [@@deriving sexp_of]
-
-  val make : ?headers:Headers.t -> ?body:Body.t -> Httpaf.Status.t -> t
-  val of_string : ?headers:Headers.t -> ?status:Httpaf.Status.t -> string -> t Deferred.t
-
-  val of_bigstring
-    :  ?headers:Headers.t
-    -> ?status:Httpaf.Status.t
-    -> Bigstring.t
-    -> t Deferred.t
+  [@@deriving sexp_of, fields]
 
   val of_file
     :  ?headers:Headers.t
     -> ?status:Httpaf.Status.t
     -> Filename.t
     -> t Deferred.t
+
+  val create : ?headers:Headers.t -> ?status:Httpaf.Status.t -> Body.t -> t Deferred.t
 end
 
 module Service : sig

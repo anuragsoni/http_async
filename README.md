@@ -13,10 +13,10 @@ open Async
 let handler req =
   let open Async_http in
   match String.split ~on:'/' req.Request.target with
-  | [ ""; "hello" ] -> Response.of_string "Hello World!"
-  | [ ""; "bigstring" ] -> Response.of_bigstring Test_data.text
+  | [ ""; "hello" ] -> Response.create (Body.of_string "Hello")
+  | [ ""; "bigstring" ] -> Response.create (Body.of_bigstring Test_data.text)
   | [ ""; "greet"; name ] when String.length name > 0 ->
-    Response.of_string (sprintf "Hello, %s" name)
+    Response.create (Body.of_string (sprintf "Hello, %s" name))
   | [ ""; "file" ] -> Response.of_file "./test/sample.html"
   | [ ""; "stream" ] ->
     (* In a real application this is where one can check if the client request
@@ -31,8 +31,8 @@ let handler req =
       Pipe.create_reader ~close_on_exception:true (fun writer ->
           Pipe.transfer pipe writer ~f:String.uppercase)
     in
-    return (Response.make ~body:(Body.of_pipe ?length response_body) `OK)
-  | _ -> Response.of_string ~status:`Not_found "Route not found"
+    Response.create (Body.of_pipe ?length response_body)
+  | _ -> Response.create ~status:`Not_found (Body.of_string "Route not found")
 ;;
 ```
 

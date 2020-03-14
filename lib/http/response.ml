@@ -12,18 +12,10 @@ type t =
   ; body : Body.t
   ; state : Univ_map.t
   }
-[@@deriving sexp_of]
+[@@deriving sexp_of, fields]
 
 let make ?(headers = Headers.empty) ?(body = Body.empty) status =
   { status; headers; body; state = Univ_map.empty }
-;;
-
-let of_string ?headers ?(status = `OK) b =
-  return (make ?headers ~body:(Body.of_string b) status)
-;;
-
-let of_bigstring ?headers ?(status = `OK) b =
-  return (make ?headers ~body:(Body.of_bigstring b) status)
 ;;
 
 let of_file ?(headers = Headers.empty) ?(status = `OK) name =
@@ -43,3 +35,5 @@ let of_file ?(headers = Headers.empty) ?(status = `OK) name =
   | Ok r -> r
   | Error _ -> return (make ~body:(Body.of_string "File not found") `Not_found)
 ;;
+
+let create ?headers ?(status = `OK) body = return (make ?headers ~body status)
