@@ -1,11 +1,22 @@
 open Core
 open Async
 open Httpaf
+module Unix = Core.Unix
 
 let write_iovecs writer iovecs =
-  List.fold_left iovecs ~init:0 ~f:(fun c { Faraday.buffer; off; len } ->
-      Writer.write_bigstring writer buffer ~pos:off ~len;
-      c + len)
+  match Writer.is_closed writer with
+  | true -> return `Closed
+  | false ->
+    let iovec_queue = Queue.create ~capacity:(List.length iovecs) () in
+    let total_bytes =
+      List.fold iovecs ~init:0 ~f:(fun acc { Faraday.buffer; off; len } ->
+          Queue.enqueue iovec_queue (Unix.IOVec.of_bigstring buffer ~pos:off ~len);
+          acc + len)
+    in
+    Writer.schedule_iovecs writer iovec_queue;
+    (* It is not safe to reuse the underlying bigstrings
+       until the writer is flushed or closed. *)
+    Writer.flushed writer >>| fun () -> `Ok total_bytes
 ;;
 
 module Server = struct
@@ -69,8 +80,9 @@ module Server = struct
     let rec writer_thread () =
       match Server_connection.next_write_operation conn with
       | `Write iovecs ->
-        let c = write_iovecs writer iovecs in
-        Server_connection.report_write_result conn (`Ok c);
+        write_iovecs writer iovecs
+        >>> fun result ->
+        Server_connection.report_write_result conn result;
         writer_thread ()
       | `Close _ ->
         Ivar.fill write_complete ();
@@ -128,8 +140,9 @@ module Client = struct
     let rec writer_thread () =
       match Client_connection.next_write_operation conn with
       | `Write iovecs ->
-        let c = write_iovecs writer iovecs in
-        Client_connection.report_write_result conn (`Ok c);
+        write_iovecs writer iovecs
+        >>> fun result ->
+        Client_connection.report_write_result conn result;
         writer_thread ()
       | `Yield -> Client_connection.yield_writer conn writer_thread
       | `Close _ -> ()
