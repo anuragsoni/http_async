@@ -5,6 +5,9 @@ module Unix = Core.Unix
 
 let write_iovecs writer iovecs =
   match Writer.is_closed writer with
+  (* schedule_iovecs will throw if the writer is closed. Checking
+     for the writer status here avoids that and allows to report the
+     closed status to httpaf. *)
   | true -> return `Closed
   | false ->
     let iovec_queue = Queue.create ~capacity:(List.length iovecs) () in
