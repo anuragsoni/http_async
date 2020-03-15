@@ -46,17 +46,3 @@ let of_bigstring b =
 
 let of_pipe ?length s = { content = Stream s; length }
 let empty = { content = Empty; length = Some 0L }
-
-let read_httpaf_body ?length on_finish body =
-  let r, w = Pipe.create () in
-  let on_eof () =
-    on_finish ();
-    Pipe.close w
-  in
-  let rec on_read b ~off ~len =
-    Pipe.write_without_pushback_if_open w (Bigstringaf.substring b ~off ~len);
-    Httpaf.Body.schedule_read body ~on_eof ~on_read
-  in
-  Httpaf.Body.schedule_read body ~on_eof ~on_read;
-  of_pipe ?length r
-;;

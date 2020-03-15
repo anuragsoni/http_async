@@ -1,4 +1,17 @@
 open Core_kernel
+open Async_kernel
+
+let read_httpaf_body body =
+  Pipe.create_reader ~close_on_exception:false (fun writer ->
+      let finished = Ivar.create () in
+      let on_eof () = Ivar.fill finished () in
+      let rec on_read b ~off ~len =
+        Pipe.write_without_pushback_if_open writer (Bigstring.to_string ~pos:off ~len b);
+        Httpaf.Body.schedule_read body ~on_eof ~on_read
+      in
+      Httpaf.Body.schedule_read body ~on_eof ~on_read;
+      Ivar.read finished)
+;;
 
 let httpaf_headers_to_headers headers =
   Httpaf.Headers.to_list headers

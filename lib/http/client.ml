@@ -64,12 +64,11 @@ let response_handler request_method resp finished response response_body =
     | _ -> None
   in
   let body =
-    Body.read_httpaf_body
-      ?length
-      (fun () ->
+    let reader = Httpaf_http.read_httpaf_body response_body in
+    upon (Pipe.closed reader) (fun () ->
         Ivar.fill finished ();
-        Httpaf.Body.close_reader response_body)
-      response_body
+        Httpaf.Body.close_reader response_body);
+    Body.of_pipe ?length reader
   in
   Ivar.fill resp (Ok (Httpaf_http.httpaf_response_to_response response body))
 ;;
