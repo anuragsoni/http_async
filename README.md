@@ -1,6 +1,6 @@
 # async-http
 
-This is very much a Work in progress, and is far from usable. Async based http toolkit built around httpaf.
+Work in progress async based http toolkit, built around httpaf.
 
 Server:
 
