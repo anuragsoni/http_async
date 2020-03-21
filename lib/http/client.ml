@@ -155,7 +155,11 @@ let request
 ;;
 
 let get ?ssl_options ?headers uri = request ?ssl_options ?headers `GET uri
+let head ?ssl_options ?headers uri = request ?ssl_options ?headers `HEAD uri
 
-let post ?ssl_options ?headers ?(body = Body.empty) uri =
-  request ?ssl_options ?headers ~body `POST uri
+let delete ?ssl_options ?headers ?body uri =
+  request ?ssl_options ?headers ?body `DELETE uri
 ;;
+
+let post ?ssl_options ?headers ?body uri = request ?ssl_options ?headers ?body `POST uri
+let put ?ssl_options ?headers ?body uri = request ?ssl_options ?headers ?body `PUT uri

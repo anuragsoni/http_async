@@ -82,13 +82,33 @@ module Client : sig
     -> Uri.t
     -> Response.t Deferred.Or_error.t
 
+  val head
+    :  ?ssl_options:Async_connection.Client.ssl_options
+    -> ?headers:Headers.t
+    -> Uri.t
+    -> Response.t Deferred.Or_error.t
+
   val get
     :  ?ssl_options:Async_connection.Client.ssl_options
     -> ?headers:Headers.t
     -> Uri.t
     -> Response.t Deferred.Or_error.t
 
+  val delete
+    :  ?ssl_options:Async_connection.Client.ssl_options
+    -> ?headers:Headers.t
+    -> ?body:Body.t
+    -> Uri.t
+    -> Response.t Deferred.Or_error.t
+
   val post
+    :  ?ssl_options:Async_connection.Client.ssl_options
+    -> ?headers:Headers.t
+    -> ?body:Body.t
+    -> Uri.t
+    -> Response.t Deferred.Or_error.t
+
+  val put
     :  ?ssl_options:Async_connection.Client.ssl_options
     -> ?headers:Headers.t
     -> ?body:Body.t
