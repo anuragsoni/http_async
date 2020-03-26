@@ -3,6 +3,29 @@ open Async
 module Logger : Log.Global_intf
 
 module Server : sig
+  type ssl_options =
+    { crt_file : string
+    ; key_file : string
+    ; version : Async_ssl.Ssl.Version.t option
+    ; options : Async_ssl.Ssl.Opt.t list option
+    ; name : string option
+    ; allowed_ciphers : [ `Secure | `Openssl_default | `Only of string list ] option
+    ; ca_file : string option
+    ; ca_path : string option
+    }
+
+  val create_ssl_options
+    :  crt_file:string
+    -> key_file:string
+    -> ?version:Async_ssl.Ssl.Version.t
+    -> ?options:Async_ssl.Ssl.Opt.t list
+    -> ?name:string
+    -> ?allowed_ciphers:[ `Secure | `Openssl_default | `Only of string list ]
+    -> ?ca_file:string
+    -> ?ca_path:string
+    -> unit
+    -> ssl_options
+
   (** [create] delegates to Async's [Tcp.Server.create]. It
       forwards a reader & writer to the callback function, and the
       reader & writer will be closed if the deferred returned by the callback
@@ -11,8 +34,7 @@ module Server : sig
       an SSL connection is setup instead.
   *)
   val create
-    :  ?crt_file:string
-    -> ?key_file:string
+    :  ?ssl_options:ssl_options
     -> ?buffer_age_limit:Writer.buffer_age_limit
     -> ?max_connections:int
     -> ?max_accepts_per_batch:int

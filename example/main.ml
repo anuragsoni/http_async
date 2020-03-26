@@ -29,11 +29,13 @@ let handler req =
 let main port =
   let where_to_listen = Tcp.Where_to_listen.of_port port in
   Async_connection.(
-    Server.create
-    (* ~crt_file:"./certs/localhost.pem" *)
-    (* ~key_file:"./certs/localhost.key" *)
-      ~on_handler_error:`Ignore
-      where_to_listen)
+    (* let ssl_options = *)
+    (*   Server.create_ssl_options *)
+    (*     ~crt_file:"./certs/localhost.pem" *)
+    (*     ~key_file:"./certs/localhost.key" *)
+    (*     () *)
+    (* in *)
+    Server.create ~on_handler_error:`Ignore where_to_listen)
     (Async_http.Server.create_connection_handler handler)
   >>= fun server ->
   Deferred.forever () (fun () ->

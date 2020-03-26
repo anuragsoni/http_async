@@ -4,13 +4,56 @@ open Async_ssl
 module Logger = Log.Make_global ()
 
 module Server = struct
-  let create_ssl handler ~crt_file ~key_file r w =
+  type ssl_options =
+    { crt_file : string
+    ; key_file : string
+    ; version : Async_ssl.Ssl.Version.t option
+    ; options : Async_ssl.Ssl.Opt.t list option
+    ; name : string option
+    ; allowed_ciphers : [ `Secure | `Openssl_default | `Only of string list ] option
+    ; ca_file : string option
+    ; ca_path : string option
+    }
+
+  let create_ssl_options
+      ~crt_file
+      ~key_file
+      ?version
+      ?options
+      ?name
+      ?allowed_ciphers
+      ?ca_file
+      ?ca_path
+      ()
+    =
+    { crt_file; key_file; version; options; name; allowed_ciphers; ca_file; ca_path }
+  ;;
+
+  let create_ssl
+      { crt_file; key_file; version; options; name; allowed_ciphers; ca_file; ca_path }
+      handler
+      r
+      w
+    =
     let net_to_ssl = Reader.pipe r in
     let ssl_to_net = Writer.pipe w in
     let app_to_ssl, app_writer = Pipe.create () in
     let app_reader, ssl_to_app = Pipe.create () in
     match%bind
-      Ssl.server ~crt_file ~key_file ~net_to_ssl ~ssl_to_net ~ssl_to_app ~app_to_ssl ()
+      Ssl.server
+        ~crt_file
+        ~key_file
+        ?version
+        ?options
+        ?name
+        ?allowed_ciphers
+        ?ca_file
+        ?ca_path
+        ~net_to_ssl
+        ~ssl_to_net
+        ~ssl_to_app
+        ~app_to_ssl
+        ()
     with
     | Error e ->
       Logger.error_s ([%sexp_of: Error.t] e);
@@ -43,8 +86,7 @@ module Server = struct
   ;;
 
   let create
-      ?crt_file
-      ?key_file
+      ?ssl_options
       ?buffer_age_limit
       ?max_connections
       ?max_accepts_per_batch
@@ -63,9 +105,8 @@ module Server = struct
       ~on_handler_error
       where_to_listen
       (fun addr r w ->
-        match crt_file, key_file with
-        | Some crt_file, Some key_file ->
-          create_ssl (handle_client addr) ~crt_file ~key_file r w
+        match ssl_options with
+        | Some ssl_options -> create_ssl ssl_options (handle_client addr) r w
         | _ -> handle_client addr r w)
   ;;
 end
