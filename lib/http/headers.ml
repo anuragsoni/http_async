@@ -20,6 +20,18 @@ let of_list xs = Map.of_alist_multi (module Header_key) xs
 let add key data t = Map.add_multi t ~key ~data
 let find key t = Map.find t key
 
+let get key t =
+  match find key t with
+  | None -> []
+  | Some x -> x
+;;
+
+let exists key t =
+  match find key t with
+  | None | Some [] -> false
+  | _ -> true
+;;
+
 let add_if_missing key data t =
   match find key t with
   | None -> add key data t

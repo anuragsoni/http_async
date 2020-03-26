@@ -14,6 +14,7 @@ module Server = struct
     ; ca_file : string option
     ; ca_path : string option
     }
+  [@@deriving sexp_of, fields]
 
   let create_ssl_options
       ~crt_file

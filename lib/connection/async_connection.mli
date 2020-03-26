@@ -3,22 +3,27 @@ open Async
 module Logger : Log.Global_intf
 
 module Server : sig
+  open Async_ssl
+
   type ssl_options =
     { crt_file : string
     ; key_file : string
-    ; version : Async_ssl.Ssl.Version.t option
-    ; options : Async_ssl.Ssl.Opt.t list option
+    ; version : Ssl.Version.t option
+    ; options : Ssl.Opt.t list option
     ; name : string option
     ; allowed_ciphers : [ `Secure | `Openssl_default | `Only of string list ] option
     ; ca_file : string option
     ; ca_path : string option
     }
+  [@@deriving sexp_of, fields]
+  (** [ssl_options] can be used to forward the various
+      server ssl parameters to [Async_ssl]'s server setup. *)
 
   val create_ssl_options
     :  crt_file:string
     -> key_file:string
-    -> ?version:Async_ssl.Ssl.Version.t
-    -> ?options:Async_ssl.Ssl.Opt.t list
+    -> ?version:Ssl.Version.t
+    -> ?options:Ssl.Opt.t list
     -> ?name:string
     -> ?allowed_ciphers:[ `Secure | `Openssl_default | `Only of string list ]
     -> ?ca_file:string
@@ -26,13 +31,6 @@ module Server : sig
     -> unit
     -> ssl_options
 
-  (** [create] delegates to Async's [Tcp.Server.create]. It
-      forwards a reader & writer to the callback function, and the
-      reader & writer will be closed if the deferred returned by the callback
-      is fulfilled, or if there is an exception during the process. In addition,
-      if the user provides the location for both public (crt_file) and private (key_file)
-      an SSL connection is setup instead.
-  *)
   val create
     :  ?ssl_options:ssl_options
     -> ?buffer_age_limit:Writer.buffer_age_limit
@@ -44,6 +42,13 @@ module Server : sig
     -> ('a, 'b) Tcp.Where_to_listen.t
     -> ('a -> Reader.t -> Writer.t -> unit Deferred.t)
     -> ('a, 'b) Tcp.Server.t Deferred.t
+  (** [create] delegates to Async's [Tcp.Server.create]. It
+      forwards a reader & writer to the callback function, and the
+      reader & writer will be closed if the deferred returned by the callback
+      is fulfilled, or if there is an exception during the process. In addition,
+      if the user provides the location for both public (crt_file) and private (key_file)
+      an SSL connection is setup instead.
+  *)
 end
 
 module Client : sig

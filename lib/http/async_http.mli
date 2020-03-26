@@ -3,28 +3,86 @@ open Async
 
 module Headers : sig
   type t [@@deriving sexp]
+  (** Headers are a collection of key,value pairs where
+      both key and values are strings. One difference compared to
+      a regular [String.Map.t] is that all comparison operations
+      on the key are case-insensitive. *)
 
   val empty : t
+  (** [empty] Creates an empty collection of headers. *)
+
   val of_list : (string * string) list -> t
+  (** [of_list] converts an association list to a collection of headers.
+      The original case for the header key will be preserved, but internally
+      any further comparisons will be case-insensitive. *)
+
   val add : string -> string -> t -> t
-  val find : string -> t -> string list option
+  (** [add k v t] returns a new header collection containing the same
+      items as the original, plus a new key/value pair from [k] to [v].
+      If [k] already existed in the collection, the updated entry in the headers
+      will associate [k] with a list containing the existing values in addition to [v]. *)
+
+  val exists : string -> t -> bool
+  (** [exists k t] = true if there is a header with key equal to k. *)
+
+  val get : string -> t -> string list
+  (** [get k t] returns the list of values associated the input header key. *)
+
   val add_if_missing : string -> string -> t -> t
+  (** [add_if_missing] only adds a value to the header collection if the key
+      doesn't already exist. Otherwise this results in a no-op. *)
+
   val remove : string -> t -> t
+  (** [remove k t] returns a new header collection with the key k removed. *)
+
   val pp : Format.formatter -> t -> unit
   val pp_hum : Format.formatter -> t -> unit [@@ocaml.toplevel_printer]
 end
 
 module Body : sig
   type t [@@deriving sexp_of]
+  (** The body type is constructed as a wrapper around a value that's either
+      a fixed lenth encoded string style body, or a streaming body that is
+      represented as [Async_kernel.Pipe.t]. Some basic converters are provided
+      that allow creating bodies from strings/bigstrings/pipes etc, and convert
+      a body to an Async pipe which the user can then consume by using all
+      async operations that are already available on a Pipe. *)
 
   val length : t -> Int64.t option
+  (** [length t] returns the length of the body if known. If the body was
+      created via a fixed length encoded HTTP body then the length is known.
+      But when dealing with chunk encoded bodies, if the headers don't
+      contain information about the actual length, then our body type
+      will still be able to parse the entire content, but it won't store
+      the length. *)
+
   val drain : t -> unit Deferred.t
+  (** [drain t] will repeatedly read values from the body pipe
+      and discard them. *)
+
   val to_string : t -> string Deferred.t
+  (** [to_string t] returns a deferred value that will eventually be fulfilled to a
+      string representation of the body. If dealing with streaming bodies,
+      be careful when using this, as the deferred will not be fulfilled until the entire
+      body is available. It is recommended to use the pipe operations [to_pipe]
+      so one can start consuming content incrementally using the functionality
+      available in [Async_kernel.Pipe]. *)
+
   val to_pipe : t -> string Pipe.Reader.t
+  (** [to_pipe t] converts the body into an async pipe. *)
+
   val empty : t
+  (** [empty] represents the empty body of size 0L. *)
+
   val of_string : string -> t
+  (** [of_string] creates a fixed length body from a string. *)
+
   val of_bigstring : Bigstring.t -> t
+  (** [of_bigstring] creates a fixed length body from a bigstring. *)
+
   val of_pipe : ?length:Int64.t -> string Pipe.Reader.t -> t
+  (** [of_pipe] takes a string pipe and uses that to create a streaming body.
+      If length is provided, the value will be used to create the content-length header. *)
 end
 
 module Request : sig
