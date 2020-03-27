@@ -94,6 +94,16 @@ module Request : sig
     ; meth : Httpaf.Method.t
     }
   [@@deriving sexp_of, fields]
+  (** A request consists of a [string] target url, a collection of headers,
+      a request body that can be empty and the HTTP verb that was requested.
+      In addition to that there is a [state] that is represented as a
+      heterogenous value map. The state can be useful when writing "middlewares",
+      with the idea that a middleware can stash items in there to forward something
+      down the chain of middlewares. The middleware creating the entry can encapsulate
+      the key to the state, so any consumer will have to access it via the public API
+      and ensure that even though different parts of the request lifecycle
+      could potentially access entries (in a type safe manner), they won't be able
+      to modify/mess with a middleware's data. *)
 
   val make : ?headers:Headers.t -> ?body:Body.t -> Httpaf.Method.t -> string -> t
 end
@@ -106,12 +116,23 @@ module Response : sig
     ; state : Univ_map.t
     }
   [@@deriving sexp_of, fields]
+  (** Similar to [Request] the response contains a state represented as
+      a heterogenous value map. In addition to that there is a response body,
+      a HTTP status and the response headers. When creating response bodies
+      if the Content-type header isn't provided, the library will attempt
+      to create one if the length of the body can be determined. *)
 
   val of_file
     :  ?headers:Headers.t
     -> ?status:Httpaf.Status.t
     -> Filename.t
     -> t Deferred.t
+  (** [of_file] expects a fully qualified path to a file. Its contents are then
+      read and a streaming response is created that is used to create the response.
+      The library will attempt to populate the correct content-type headers by using
+      the file extension to create a MIME type. In addition to this, [of_file]
+      will verify if the input name is indeed a file before attempting to create
+      a response. *)
 
   val create : ?headers:Headers.t -> ?status:Httpaf.Status.t -> Body.t -> t Deferred.t
 end
