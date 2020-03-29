@@ -1,7 +1,35 @@
 open Base
 open Async_kernel
 
-let create_connection_handler service =
+let create_error_handler handler =
+  let error_handler ?request error start_response =
+    let req_headers =
+      Option.map request ~f:(fun req -> req.Httpaf.Request.headers)
+      |> Option.value ~default:Httpaf.Headers.empty
+      |> Httpaf_http.httpaf_headers_to_headers
+    in
+    don't_wait_for
+      (let%bind headers, body = handler req_headers error in
+       let length = Body.length body in
+       let headers =
+         match length with
+         | None -> headers
+         | Some l -> Headers.add_if_missing "content-length" (Int64.to_string l) headers
+       in
+       let res_body = start_response (Httpaf_http.headers_to_httpaf_headers headers) in
+       let%map () =
+         Pipe.iter_without_pushback (Body.to_pipe body) ~f:(fun v ->
+             Httpaf.Body.write_string res_body v)
+       in
+       Httpaf.Body.close_writer res_body)
+  in
+  error_handler
+;;
+
+type error_handler =
+  Headers.t -> Httpaf.Server_connection.error -> (Headers.t * Body.t) Deferred.t
+
+let create_connection_handler ?error_handler service =
   let request_handler _conn reqd =
     let req = Httpaf.Reqd.request reqd in
     let req_body = Httpaf.Reqd.request_body reqd in
@@ -56,5 +84,6 @@ let create_connection_handler service =
           We can perform cleanup here so the request_body can be closed. *)
        Pipe.close_read (Body.to_pipe request.body))
   in
-  Protocol.Server.create_connection_handler ~request_handler
+  let error_handler = Option.map error_handler ~f:create_error_handler in
+  Protocol.Server.create_connection_handler ?error_handler ~request_handler
 ;;

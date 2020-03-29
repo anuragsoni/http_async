@@ -142,14 +142,25 @@ module Service : sig
 end
 
 module Server : sig
+  type error_handler =
+    Headers.t -> Httpaf.Server_connection.error -> (Headers.t * Body.t) Deferred.t
+  (** [error_handler] is used to handle any exceptions that occur during the lifecycle
+      of a http request handler. There is a default error_handler that will be used
+      if the user doesn't provide one, but users are encouraged to provide an error handler
+      if they'd like to customize the error response body. *)
+
   val create_connection_handler
-    :  Service.t
+    :  ?error_handler:error_handler
+    -> Service.t
     -> ?config:Httpaf.Config.t
-    -> ?error_handler:Httpaf.Server_connection.error_handler
     -> 'a
     -> Reader.t
     -> Writer.t
     -> unit Deferred.t
+  (** [create_connection_handler] accepts a [Service.t]
+      and converts that into a handler that can then be forwarded
+      as the callback for [Async_connection.Server.create] or
+      [Async.Tcp.Server.create] *)
 end
 
 module Client : sig
@@ -160,6 +171,9 @@ module Client : sig
     -> Httpaf.Method.standard
     -> Uri.t
     -> Response.t Deferred.Or_error.t
+  (** [request] can be used to create a HTTP client call. The uri
+      is used to decide whether to make a regular tcp connection
+      or an encrypted connection using async_ssl. *)
 
   val head
     :  ?ssl_options:Async_connection.Client.ssl_options

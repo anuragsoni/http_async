@@ -4,6 +4,7 @@ open Async
 let handler req =
   let open Async_http in
   match String.split ~on:'/' req.Request.target with
+  | [ ""; "error" ] -> failwith "Error in server"
   | [ ""; "hello" ] -> Response.create (Body.of_string "Hello")
   | [ ""; "bigstring" ] -> Response.create (Body.of_bigstring Test_data.text)
   | [ ""; "greet"; name ] when String.length name > 0 ->
@@ -26,6 +27,13 @@ let handler req =
   | _ -> Response.create ~status:`Not_found (Body.of_string "Route not found")
 ;;
 
+let error_handler _headers _error =
+  let open Async_http in
+  let headers = Headers.of_list [ "connection-type", "application/json" ] in
+  let body = Body.of_string {|{"status": "internal server error"}|} in
+  return (headers, body)
+;;
+
 let main port =
   let where_to_listen = Tcp.Where_to_listen.of_port port in
   Async_connection.(
@@ -36,7 +44,7 @@ let main port =
     (*     () *)
     (* in *)
     Server.create ~on_handler_error:`Ignore where_to_listen)
-    (Async_http.Server.create_connection_handler handler)
+    (Async_http.Server.create_connection_handler ~error_handler handler)
   >>= fun server ->
   Deferred.forever () (fun () ->
       Clock.after Time.Span.(of_sec 0.5)
