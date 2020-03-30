@@ -1,6 +1,20 @@
 # async-http
 
-Work in progress async based http toolkit, built around httpaf.
+Work in progress async based http toolkit.
+The project aims to complement [Async](https://opensource.janestreet.com/async/) and [httpaf](https://github.com/inhabitedtype/httpaf) by providing utilities to help setup async HTTP servers and clients. The project includes the following libraries:
+
+1. Async_connection: A library that aims to provide a uniform interface to create regular TCP connections, and connections encrypted via async_ssl. The library exposes functions from the Tcp module from Async that work with regular Async readers and writers.
+
+2. Async_http: A library that provides a simpler way to create `request -> response Deferred.t` style request handlers. It is built on top of httpaf, and enhances the request/response types with a `Async_kernel.Pipe.t` aware Body type that can be used for streaming, simpler request and error handlers and a request/response state modelled using a heterogenous map. The handlers return `Deferred.t` so they can be combined using regular async combinators. Async_http can be used without Async_connection by plugging it into anything that works with async readers and writers.
+
+### Install
+
+```sh
+opam pin add async-connection.dev git+https://github.com/anuragsoni/async-http.git
+opam pin add async-http.dev git+https://github.com/anuragsoni/async-http.git
+```
+
+### Examples
 
 Server:
 
