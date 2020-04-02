@@ -14,12 +14,24 @@ before_script:
   - '[ ! -d "_opam" ] && opam switch create . 4.09.0 --no-install'
   - opam pin add async-http.dev -n .
   - opam depext async-http
+  - opam install odoc
   - opam install -t . --deps-only
 
 build:
   stage: build
   script:
     - opam exec -- dune build
+  only:
+    - master
+
+pages:
+  stage: deploy
+  script:
+    - opam exec -- dune build @doc
+    - mv ./_build/default/_doc/_html public
+  artifacts:
+    paths:
+      - public
   only:
     - master
 
