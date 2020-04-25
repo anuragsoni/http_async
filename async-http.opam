@@ -10,6 +10,7 @@ bug-reports: "https://gitlab.com/anuragsoni/async-http/issues"
 depends: [
   "ocaml" {>= "4.08.0"}
   "dune" {>= "2.1"}
+  "async-connection"
   "core" {>= "0.13"}
   "async" {>= "0.13"}
   "ppx_jane"

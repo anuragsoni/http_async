@@ -44,6 +44,7 @@
    (>= 4.08.0))
   (dune
    (>= 2.1))
+  async-connection
   (core
    (>= 0.13))
   (async
