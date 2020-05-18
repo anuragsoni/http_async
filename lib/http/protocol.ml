@@ -3,6 +3,46 @@ open Async
 open Httpaf
 module Unix = Core.Unix
 
+(* Buffer module based on https://github.com/inhabitedtype/httpaf/blob/bb5502e0d41bb3916b9e62ff3c0227f728aba850/async/httpaf_async.ml#L7 *)
+module Buf = struct
+  type t =
+    { buf : Bigstring.t
+    ; size : int
+    ; mutable pos : int
+    ; mutable len : int
+    }
+
+  let create size = { buf = Bigstring.create size; size; pos = 0; len = 0 }
+
+  let shift t =
+    if t.len = 0
+    then (
+      t.pos <- 0;
+      t.len <- 0)
+    else if t.pos > 0
+    then Bigstring.blit ~src:t.buf ~src_pos:t.pos ~dst:t.buf ~dst_pos:0 ~len:t.len;
+    t.pos <- 0
+  ;;
+
+  let read t f =
+    let num = f t.buf ~pos:t.pos ~len:t.len in
+    t.pos <- t.pos + num;
+    t.len <- t.len - num;
+    if t.len = 0 then t.pos <- 0;
+    num
+  ;;
+
+  let write t reader =
+    shift t;
+    let bstr = Bigsubstring.create ~pos:(t.pos + t.len) ~len:(t.size - t.len) t.buf in
+    match%map Reader.read_bigsubstring reader bstr with
+    | `Eof -> `Eof
+    | `Ok n as r ->
+      t.len <- t.len + n;
+      r
+  ;;
+end
+
 let write_iovecs writer iovecs =
   match Writer.is_closed writer with
   (* schedule_iovecs will throw if the writer is closed. Checking
@@ -41,40 +81,34 @@ module Server = struct
 
   let create_connection_handler
       ~request_handler
-      ?config
+      ?(config = Httpaf.Config.default)
       ?(error_handler = default_error_handler)
       addr
       reader
       writer
     =
+    let buffer = Buf.create config.Httpaf.Config.read_buffer_size in
     let request_handler = request_handler addr in
     let error_handler = error_handler in
     let read_complete = Ivar.create () in
     let write_complete = Ivar.create () in
-    let conn = Server_connection.create ?config ~error_handler request_handler in
-    let read_eof conn buf =
-      ignore
-        (Server_connection.read_eof
-           conn
-           (Bigstring.of_string buf)
-           ~off:0
-           ~len:(String.length buf)
-          : int)
-    in
+    let conn = Server_connection.create ~config ~error_handler request_handler in
     let rec reader_thread () =
       match Server_connection.next_read_operation conn with
       | `Read ->
-        Reader.read_one_chunk_at_a_time reader ~handle_chunk:(fun buf ~pos ~len ->
-            let c = Server_connection.read conn buf ~off:pos ~len in
-            return (`Consumed (c, `Need_unknown)))
-        >>> (function
-        | `Stopped () -> assert false
-        | `Eof ->
-          read_eof conn "";
-          reader_thread ()
-        | `Eof_with_unconsumed_data buf ->
-          read_eof conn buf;
-          reader_thread ())
+        upon (Buf.write buffer reader) (function
+            | `Eof ->
+              ignore
+                (Buf.read buffer (fun bstr ~pos ~len ->
+                     Server_connection.read_eof conn bstr ~off:pos ~len)
+                  : int);
+              reader_thread ()
+            | `Ok _ ->
+              ignore
+                (Buf.read buffer (fun bstr ~pos ~len ->
+                     Server_connection.read conn bstr ~off:pos ~len)
+                  : int);
+              reader_thread ())
       | `Close ->
         Ivar.fill read_complete ();
         ()
@@ -111,33 +145,34 @@ module Server = struct
 end
 
 module Client = struct
-  let request ?config ~response_handler ~error_handler request reader writer =
+  let request
+      ?(config = Httpaf.Config.default)
+      ~response_handler
+      ~error_handler
+      request
+      reader
+      writer
+    =
     let body, conn =
-      Client_connection.request ?config request ~error_handler ~response_handler
+      Client_connection.request ~config request ~error_handler ~response_handler
     in
-    let read_eof conn buf =
-      ignore
-        (Client_connection.read_eof
-           conn
-           (Bigstring.of_string buf)
-           ~off:0
-           ~len:(String.length buf)
-          : int)
-    in
+    let buffer = Buf.create config.Httpaf.Config.read_buffer_size in
     let rec reader_thread () =
       match Client_connection.next_read_operation conn with
       | `Read ->
-        Reader.read_one_chunk_at_a_time reader ~handle_chunk:(fun buf ~pos ~len ->
-            let c = Client_connection.read conn buf ~off:pos ~len in
-            return (`Consumed (c, `Need_unknown)))
-        >>> (function
-        | `Stopped () -> assert false
-        | `Eof ->
-          read_eof conn "";
-          reader_thread ()
-        | `Eof_with_unconsumed_data buf ->
-          read_eof conn buf;
-          reader_thread ())
+        upon (Buf.write buffer reader) (function
+            | `Eof ->
+              ignore
+                (Buf.read buffer (fun bstr ~pos ~len ->
+                     Client_connection.read_eof conn bstr ~off:pos ~len)
+                  : int);
+              reader_thread ()
+            | `Ok _ ->
+              ignore
+                (Buf.read buffer (fun bstr ~pos ~len ->
+                     Client_connection.read conn bstr ~off:pos ~len)
+                  : int);
+              reader_thread ())
       | `Close -> ()
     in
     let rec writer_thread () =
