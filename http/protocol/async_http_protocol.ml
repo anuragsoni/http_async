@@ -7,54 +7,13 @@ module Logger = Log.Make_global ()
 
 let log = Lazy.force Logger.log
 
-(* Buffer module based on
-   https://github.com/inhabitedtype/httpaf/blob/bb5502e0d41bb3916b9e62ff3c0227f728aba850/async/httpaf_async.ml#L7 *)
-module Buf = struct
-  type t =
-    { buf : Bigstring.t
-    ; size : int
-    ; mutable pos : int
-    ; mutable len : int
-    }
-
-  let create size = { buf = Bigstring.create size; size; pos = 0; len = 0 }
-
-  let shift t =
-    if t.len = 0
-    then (
-      t.pos <- 0;
-      t.len <- 0)
-    else if t.pos > 0
-    then Bigstring.blit ~src:t.buf ~src_pos:t.pos ~dst:t.buf ~dst_pos:0 ~len:t.len;
-    t.pos <- 0
-  ;;
-
-  let read t f =
-    let num = f t.buf ~pos:t.pos ~len:t.len in
-    t.pos <- t.pos + num;
-    t.len <- t.len - num;
-    if t.len = 0 then t.pos <- 0;
-    num
-  ;;
-
-  let write t reader =
-    shift t;
-    let bstr = Bigsubstring.create ~pos:(t.pos + t.len) ~len:(t.size - t.len) t.buf in
-    match%map Reader.read_bigsubstring reader bstr with
-    | `Eof -> `Eof
-    | `Ok n as r ->
-      t.len <- t.len + n;
-      r
-  ;;
-end
-
 let write_iovecs writer iovecs =
   match Writer.is_closed writer with
   (* schedule_iovecs will throw if the writer is closed. Checking for the writer status
      here avoids that and allows to report the closed status to httpaf. *)
   | true -> return `Closed
   | false ->
-    let iovec_queue = Queue.create ~capacity:(List.length iovecs) () in
+    let iovec_queue = Queue.create () in
     let total_bytes =
       List.fold iovecs ~init:0 ~f:(fun acc { Faraday.buffer; off; len } ->
           Queue.enqueue iovec_queue (Unix.IOVec.of_bigstring buffer ~pos:off ~len);
@@ -90,7 +49,6 @@ module Server = struct
       reader
       writer
     =
-    let buffer = Buf.create config.Httpaf.Config.read_buffer_size in
     let error_handler = error_handler in
     let read_complete = Ivar.create () in
     let write_complete = Ivar.create () in
@@ -98,19 +56,19 @@ module Server = struct
     let rec reader_thread () =
       match Server_connection.next_read_operation conn with
       | `Read ->
-        upon (Buf.write buffer reader) (function
-            | `Eof ->
-              ignore
-                (Buf.read buffer (fun bstr ~pos ~len ->
-                     Server_connection.read_eof conn bstr ~off:pos ~len)
-                  : int);
-              reader_thread ()
-            | `Ok _ ->
-              ignore
-                (Buf.read buffer (fun bstr ~pos ~len ->
-                     Server_connection.read conn bstr ~off:pos ~len)
-                  : int);
-              reader_thread ())
+        Reader.read_one_chunk_at_a_time reader ~handle_chunk:(fun buf ~pos ~len ->
+            let consumed = Server_connection.read conn buf ~off:pos ~len in
+            return (`Consumed (consumed, `Need_unknown)))
+        >>> (function
+        | `Eof ->
+          ignore (Server_connection.read_eof conn Bigstringaf.empty ~off:0 ~len:0 : int);
+          reader_thread ()
+        | `Eof_with_unconsumed_data buf ->
+          let buf = Bigstring.of_string buf in
+          ignore
+            (Server_connection.read_eof conn buf ~off:0 ~len:(Bigstring.length buf) : int);
+          reader_thread ()
+        | `Stopped () -> assert false)
       | `Close ->
         Ivar.fill read_complete ();
         ()
@@ -138,9 +96,6 @@ module Server = struct
         Server_connection.report_exn conn e);
     Scheduler.within ~monitor reader_thread;
     Scheduler.within ~monitor writer_thread;
-    let read_write_finished =
-      Deferred.all_unit [ Ivar.read write_complete; Ivar.read read_complete ]
-    in
-    read_write_finished
+    Deferred.all_unit [ Ivar.read write_complete; Ivar.read read_complete ]
   ;;
 end
