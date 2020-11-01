@@ -1,6 +1,8 @@
 open Core
 open Async
 
+let stdout = Lazy.force Writer.stdout
+
 let text =
   "CHAPTER I. Down the Rabbit-Hole  Alice was beginning to get very tired of sitting by \
    her sister on the bank, and of having nothing to do: once or twice she had peeped \
@@ -34,21 +36,31 @@ let text = Bigstringaf.of_string ~off:0 ~len:(String.length text) text
 let request_handler reqd =
   let open Httpaf in
   let req_body = Reqd.request_body reqd in
-  Body.close_reader req_body;
-  let headers =
-    Httpaf.Headers.of_list [ "Content-Length", Bigstring.length text |> Int.to_string ]
+  let on_eof () =
+    don't_wait_for (Writer.flushed stdout);
+    let headers =
+      Httpaf.Headers.of_list [ "Content-Length", Bigstring.length text |> Int.to_string ]
+    in
+    Reqd.respond_with_bigstring reqd (Response.create ~headers `OK) text
   in
-  Reqd.respond_with_bigstring reqd (Response.create ~headers `OK) text
+  let rec on_read buf ~off ~len =
+    Writer.write_bigstring stdout buf ~pos:off ~len;
+    Body.schedule_read req_body ~on_eof ~on_read
+  in
+  Body.schedule_read req_body ~on_eof ~on_read
 ;;
 
 let run port =
   let where_to_listen = Tcp.Where_to_listen.of_port port in
   let error_handler = `Raise in
   let handler = Async_http_protocol.Server.create_connection_handler ~request_handler in
-  let server = Async_connection.Server.create error_handler where_to_listen handler in
-  Deferred.forever () (fun () ->
-      Clock.after Time.Span.(of_sec 0.5)
-      >>| fun () -> Log.Global.printf "conns: %d" (Tcp.Server.num_connections server));
+  let server =
+    Async_connection.Server.create ~backlog:11_000 error_handler where_to_listen handler
+  in
+  Log.Global.printf
+    ~level:`Info
+    "Server listening on: http://localhost:%d"
+    (Tcp.Server.listening_on server);
   Deferred.never ()
 ;;
 
