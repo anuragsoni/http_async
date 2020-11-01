@@ -1,0 +1,6 @@
+(library
+ (name async_connection)
+ (public_name async_http.connection)
+ (preprocess
+  (pps ppx_jane ppx_log))
+ (libraries async async_ssl core))

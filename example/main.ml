@@ -1,63 +1,64 @@
 open Core
 open Async
 
-let handler req =
-  let open Async_http in
-  match String.split ~on:'/' req.Request.target with
-  | [ ""; "error" ] -> failwith "Error in server"
-  | [ ""; "hello" ] -> Response.create (Body.of_string "Hello")
-  | [ ""; "bigstring" ] -> Response.create (Body.of_bigstring Test_data.text)
-  | [ ""; "greet"; name ] when String.length name > 0 ->
-    Response.create (Body.of_string (sprintf "Hello, %s" name))
-  | [ ""; "file" ] -> Response.of_file "./test/sample.html"
-  | [ ""; "stream" ] ->
-    (* In a real application this is where one can check if the client request
-       is using the appropriate HTTP method. *)
-    let body = req.Request.body in
-    (* [length] can be empty if the request transfer encoding was chunked and no
-       actual length was provided in the header. *)
-    let length, pipe = Body.length body, Body.to_pipe body in
-    (* We can use any of the async pipe utilities to create a streaming response
-       body. *)
-    let response_body =
-      Pipe.create_reader ~close_on_exception:true (fun writer ->
-          Pipe.transfer pipe writer ~f:String.uppercase)
-    in
-    Response.create (Body.of_pipe ?length response_body)
-  | _ -> Response.create ~status:`Not_found (Body.of_string "Route not found")
+let text =
+  "CHAPTER I. Down the Rabbit-Hole  Alice was beginning to get very tired of sitting by \
+   her sister on the bank, and of having nothing to do: once or twice she had peeped \
+   into the book her sister was reading, but it had no pictures or conversations in it, \
+   <and what is the use of a book,> thought Alice <without pictures or conversations?> \
+   So she was considering in her own mind (as well as she could, for the hot day made \
+   her feel very sleepy and stupid), whether the pleasure of making a daisy-chain would \
+   be worth the trouble of getting up and picking the daisies, when suddenly a White \
+   Rabbit with pink eyes ran close by her. There was nothing so very remarkable in that; \
+   nor did Alice think it so very much out of the way to hear the Rabbit say to itself, \
+   <Oh dear! Oh dear! I shall be late!> (when she thought it over afterwards, it \
+   occurred to her that she ought to have wondered at this, but at the time it all \
+   seemed quite natural); but when the Rabbit actually took a watch out of its \
+   waistcoat-pocket, and looked at it, and then hurried on, Alice started to her feet, \
+   for it flashed across her mind that she had never before seen a rabbit with either a \
+   waistcoat-pocket, or a watch to take out of it, and burning with curiosity, she ran \
+   across the field after it, and fortunately was just in time to see it pop down a \
+   large rabbit-hole under the hedge. In another moment down went Alice after it, never \
+   once considering how in the world she was to get out again. The rabbit-hole went \
+   straight on like a tunnel for some way, and then dipped suddenly down, so suddenly \
+   that Alice had not a moment to think about stopping herself before she found herself \
+   falling down a very deep well. Either the well was very deep, or she fell very \
+   slowly, for she had plenty of time as she went down to look about her and to wonder \
+   what was going to happen next. First, she tried to look down and make out what she \
+   was coming to, but it was too dark to see anything; then she looked at the sides of \
+   the well, and noticed that they were filled with cupboards......"
 ;;
 
-let error_handler _headers _error =
-  let open Async_http in
-  let headers = Headers.of_list [ "connection-type", "application/json" ] in
-  let body = Body.of_string {|{"status": "internal server error"}|} in
-  return (headers, body)
+let text = Bigstringaf.of_string ~off:0 ~len:(String.length text) text
+
+let request_handler reqd =
+  let open Httpaf in
+  let req_body = Reqd.request_body reqd in
+  Body.close_reader req_body;
+  let headers =
+    Httpaf.Headers.of_list [ "Content-Length", Bigstring.length text |> Int.to_string ]
+  in
+  Reqd.respond_with_bigstring reqd (Response.create ~headers `OK) text
 ;;
 
-let main port =
+let run port =
   let where_to_listen = Tcp.Where_to_listen.of_port port in
-  Async_connection.(
-    (* let ssl_options = *)
-    (*   Server.create_ssl_options *)
-    (*     ~crt_file:"./certs/localhost.pem" *)
-    (*     ~key_file:"./certs/localhost.key" *)
-    (*     () *)
-    (* in *)
-    Server.create ~on_handler_error:`Ignore where_to_listen)
-    (Async_http.Server.create_connection_handler ~error_handler handler)
-  >>= fun server ->
+  let error_handler = `Raise in
+  let handler = Async_http_protocol.Server.create_connection_handler ~request_handler in
+  let server = Async_connection.Server.create error_handler where_to_listen handler in
   Deferred.forever () (fun () ->
       Clock.after Time.Span.(of_sec 0.5)
-      >>| fun () -> Log.Global.info "connections: %d" (Tcp.Server.num_connections server));
+      >>| fun () -> Log.Global.printf "conns: %d" (Tcp.Server.num_connections server));
   Deferred.never ()
 ;;
 
-let () =
+let command =
   Command.async
-    ~summary:"Sample server"
+    ~summary:"async http"
     Command.Param.(
-      map
-        (flag "-p" (optional_with_default 8080 int) ~doc:"int Server port number")
-        ~f:(fun port () -> main port))
-  |> Command.run
+      let open Command.Let_syntax in
+      let%map port = flag "-port" (optional_with_default 8080 int) ~doc:"int PORT" in
+      fun () -> run port)
 ;;
+
+let () = Command.run command

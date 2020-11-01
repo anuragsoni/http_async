@@ -1,7 +1,5 @@
-(executables
- (names main main_client)
+(executable
+ (name main)
  (preprocess
   (pps ppx_jane))
- (ocamlopt_flags
-  (:standard -O3))
- (libraries core async async-http async-connection))
+ (libraries core async async_http async_http.connection async_http.protocol))

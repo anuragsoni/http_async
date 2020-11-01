@@ -1,9 +1,14 @@
 open Core
 open Async
 open Httpaf
+open Ppx_log_async
 module Unix = Core.Unix
+module Logger = Log.Make_global ()
 
-(* Buffer module based on https://github.com/inhabitedtype/httpaf/blob/bb5502e0d41bb3916b9e62ff3c0227f728aba850/async/httpaf_async.ml#L7 *)
+let log = Lazy.force Logger.log
+
+(* Buffer module based on
+   https://github.com/inhabitedtype/httpaf/blob/bb5502e0d41bb3916b9e62ff3c0227f728aba850/async/httpaf_async.ml#L7 *)
 module Buf = struct
   type t =
     { buf : Bigstring.t
@@ -45,9 +50,8 @@ end
 
 let write_iovecs writer iovecs =
   match Writer.is_closed writer with
-  (* schedule_iovecs will throw if the writer is closed. Checking
-     for the writer status here avoids that and allows to report the
-     closed status to httpaf. *)
+  (* schedule_iovecs will throw if the writer is closed. Checking for the writer status
+     here avoids that and allows to report the closed status to httpaf. *)
   | true -> return `Closed
   | false ->
     let iovec_queue = Queue.create ~capacity:(List.length iovecs) () in
@@ -57,8 +61,8 @@ let write_iovecs writer iovecs =
           acc + len)
     in
     Writer.schedule_iovecs writer iovec_queue;
-    (* It is not safe to reuse the underlying bigstrings
-       until the writer is flushed or closed. *)
+    (* It is not safe to reuse the underlying bigstrings until the writer is flushed or
+       closed. *)
     Writer.flushed writer >>| fun () -> `Ok total_bytes
 ;;
 
@@ -67,7 +71,7 @@ module Server = struct
     let message =
       match error with
       | `Exn e ->
-        Logger.error_s ([%sexp_of: Exn.t] e);
+        [%log.error log (e : Exn.t)];
         Status.default_reason_phrase `Internal_server_error
       | (#Status.server_error | #Status.client_error) as error ->
         Status.default_reason_phrase error
@@ -80,15 +84,13 @@ module Server = struct
   ;;
 
   let create_connection_handler
-      ~request_handler
       ?(config = Httpaf.Config.default)
       ?(error_handler = default_error_handler)
-      addr
+      ~request_handler
       reader
       writer
     =
     let buffer = Buf.create config.Httpaf.Config.read_buffer_size in
-    let request_handler = request_handler addr in
     let error_handler = error_handler in
     let read_complete = Ivar.create () in
     let write_complete = Ivar.create () in
@@ -128,11 +130,10 @@ module Server = struct
     in
     let monitor = Monitor.create ~here:[%here] ~name:"AsyncHttpServer" () in
     Monitor.detach_and_iter_errors monitor ~f:(fun e ->
-        (* TODO: verify that this doesn't cause any issues.
-           In situations where the exception happens before reader is finished,
-           we want to "fill" the reader ivar. We use [Async_unix.Tcp.create] which
-           expects the deferred to be fulfilled to close the reader/writer pair.
-        *)
+        (* TODO: verify that this doesn't cause any issues. In situations where the
+           exception happens before reader is finished, we want to "fill" the reader ivar.
+           We use [Async_unix.Tcp.create] which expects the deferred to be fulfilled to
+           close the reader/writer pair. *)
         Ivar.fill_if_empty read_complete ();
         Server_connection.report_exn conn e);
     Scheduler.within ~monitor reader_thread;
@@ -141,55 +142,5 @@ module Server = struct
       Deferred.all_unit [ Ivar.read write_complete; Ivar.read read_complete ]
     in
     read_write_finished
-  ;;
-end
-
-module Client = struct
-  let request
-      ?(config = Httpaf.Config.default)
-      ~response_handler
-      ~error_handler
-      request
-      reader
-      writer
-    =
-    let body, conn =
-      Client_connection.request ~config request ~error_handler ~response_handler
-    in
-    let buffer = Buf.create config.Httpaf.Config.read_buffer_size in
-    let rec reader_thread () =
-      match Client_connection.next_read_operation conn with
-      | `Read ->
-        upon (Buf.write buffer reader) (function
-            | `Eof ->
-              ignore
-                (Buf.read buffer (fun bstr ~pos ~len ->
-                     Client_connection.read_eof conn bstr ~off:pos ~len)
-                  : int);
-              reader_thread ()
-            | `Ok _ ->
-              ignore
-                (Buf.read buffer (fun bstr ~pos ~len ->
-                     Client_connection.read conn bstr ~off:pos ~len)
-                  : int);
-              reader_thread ())
-      | `Close -> ()
-    in
-    let rec writer_thread () =
-      match Client_connection.next_write_operation conn with
-      | `Write iovecs ->
-        write_iovecs writer iovecs
-        >>> fun result ->
-        Client_connection.report_write_result conn result;
-        writer_thread ()
-      | `Yield -> Client_connection.yield_writer conn writer_thread
-      | `Close _ -> ()
-    in
-    let monitor = Monitor.create ~here:[%here] ~name:"AsyncHttpClient" () in
-    Scheduler.within ~monitor reader_thread;
-    Scheduler.within ~monitor writer_thread;
-    Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
-        Client_connection.report_exn conn exn);
-    body
   ;;
 end
