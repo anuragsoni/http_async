@@ -11,21 +11,14 @@ let write_iovecs writer iovecs =
   match Writer.is_closed writer with
   (* schedule_iovecs will throw if the writer is closed. Checking for the writer status
      here avoids that and allows to report the closed status to httpaf. *)
-  | true -> return `Closed
+  | true -> `Closed
   | false ->
-    (* XXX(anurag): traversing the list twice to allow for reserving the queue capacity
-       might be better than doubling the queue capacity multiple times? *)
-    let iovec_queue = Queue.create ~capacity:(List.length iovecs) () in
-    (* let iovec_queue = Queue.create ~capacity:(List.length iovecs) () in *)
     let total_bytes =
-      List.fold iovecs ~init:0 ~f:(fun acc { Faraday.buffer; off; len } ->
-          Queue.enqueue iovec_queue (Unix.IOVec.of_bigstring buffer ~pos:off ~len);
+      List.fold_left iovecs ~init:0 ~f:(fun acc { Faraday.buffer; off; len } ->
+          Writer.write_bigstring writer buffer ~pos:off ~len;
           acc + len)
     in
-    Writer.schedule_iovecs writer iovec_queue;
-    (* It is not safe to reuse the underlying bigstrings until the writer is flushed or
-       closed. *)
-    Writer.flushed writer >>| fun () -> `Ok total_bytes
+    `Ok total_bytes
 ;;
 
 module Server = struct
@@ -72,21 +65,16 @@ module Server = struct
             (Server_connection.read_eof conn buf ~off:0 ~len:(Bigstring.length buf) : int);
           reader_thread ()
         | `Stopped () -> assert false)
-      | `Close ->
-        Ivar.fill read_complete ();
-        ()
+      | `Close -> Ivar.fill read_complete ()
       | `Yield -> Server_connection.yield_reader conn reader_thread
     in
     let rec writer_thread () =
       match Server_connection.next_write_operation conn with
       | `Write iovecs ->
-        write_iovecs writer iovecs
-        >>> fun result ->
+        let result = write_iovecs writer iovecs in
         Server_connection.report_write_result conn result;
         writer_thread ()
-      | `Close _ ->
-        Ivar.fill write_complete ();
-        ()
+      | `Close _ -> Ivar.fill write_complete ()
       | `Yield -> Server_connection.yield_writer conn writer_thread
     in
     let monitor = Monitor.create ~here:[%here] ~name:"AsyncHttpServer" () in
