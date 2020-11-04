@@ -13,7 +13,10 @@ let write_iovecs writer iovecs =
      here avoids that and allows to report the closed status to httpaf. *)
   | true -> return `Closed
   | false ->
-    let iovec_queue = Queue.create () in
+    (* XXX(anurag): traversing the list twice to allow for reserving the queue capacity
+       might be better than doubling the queue capacity multiple times? *)
+    let iovec_queue = Queue.create ~capacity:(List.length iovecs) () in
+    (* let iovec_queue = Queue.create ~capacity:(List.length iovecs) () in *)
     let total_bytes =
       List.fold iovecs ~init:0 ~f:(fun acc { Faraday.buffer; off; len } ->
           Queue.enqueue iovec_queue (Unix.IOVec.of_bigstring buffer ~pos:off ~len);
