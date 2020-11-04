@@ -1,4 +1,4 @@
-(lang dune 2.1)
+(lang dune 2.7)
 
 (name async_http)
 
@@ -21,8 +21,6 @@
  (depends
   (ocaml
    (>= 4.08.0))
-  (dune
-   (>= 2.1))
   (core
    (>= 0.13))
   (async

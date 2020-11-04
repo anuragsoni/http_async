@@ -6,8 +6,8 @@ authors: ["Anurag Soni <anurag@sonianurag.com>"]
 license: "MIT"
 tags: ["http-server" "http-client" "http" "async" "ocaml"]
 depends: [
+  "dune" {>= "2.7"}
   "ocaml" {>= "4.08.0"}
-  "dune" {>= "2.1"}
   "core" {>= "0.13"}
   "async" {>= "0.13"}
   "ppx_jane"
@@ -15,9 +15,10 @@ depends: [
   "httpaf"
   "faraday"
   "async_ssl" {>= "0.13"}
+  "odoc" {with-doc}
 ]
 build: [
-  ["dune" "subst"] {pinned}
+  ["dune" "subst"] {dev}
   [
     "dune"
     "build"
