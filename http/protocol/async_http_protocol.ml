@@ -2,7 +2,6 @@ open Core
 open Async
 open Httpaf
 open Ppx_log_async
-module Unix = Core.Unix
 module Logger = Log.Make_global ()
 
 let log = Lazy.force Logger.log
