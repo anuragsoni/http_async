@@ -4,17 +4,16 @@ synopsis: "Async web toolkit"
 maintainer: ["Anurag Soni <anurag@sonianurag.com>"]
 authors: ["Anurag Soni <anurag@sonianurag.com>"]
 license: "MIT"
-tags: ["http-server" "http-client" "http" "async" "ocaml"]
+tags: ["http-server" "http" "async" "ocaml"]
+homepage: "https://github.com/anuragsoni/async-http"
+bug-reports: "https://github.com/anuragsoni/async-http/issues"
 depends: [
-  "dune" {>= "2.7"}
+  "dune" {>= "2.9"}
   "ocaml" {>= "4.08.0"}
-  "core" {>= "0.13"}
-  "async" {>= "0.13"}
-  "ppx_jane"
+  "shuttle_http"
+  "ppx_jane" {>= "v0.14" & < "v0.15"}
+  "async_ssl" {>= "v0.14" & < "v0.15"}
   "ppx_log"
-  "httpaf"
-  "faraday"
-  "async_ssl" {>= "0.13"}
   "odoc" {with-doc}
 ]
 build: [
@@ -26,9 +25,11 @@ build: [
     name
     "-j"
     jobs
+    "--promote-install-files=false"
     "@install"
     "@runtest" {with-test}
     "@doc" {with-doc}
   ]
+  ["dune" "install" "-p" name "--create-install-files" name]
 ]
-dev-repo: "git+https://git.sr.ht/~soni/async-http"
+dev-repo: "git+https://github.com/anuragsoni/async-http.git"

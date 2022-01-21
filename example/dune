@@ -2,5 +2,4 @@
  (name main)
  (preprocess
   (pps ppx_jane))
- (libraries core async async_http.core async_http.connection
-   async_http.protocol))
+ (libraries async_http))

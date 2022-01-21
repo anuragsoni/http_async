@@ -1,11 +1,11 @@
-(lang dune 2.7)
+(lang dune 2.9)
 
 (name async_http)
 
 (generate_opam_files true)
 
 (source
- (uri "git+https://git.sr.ht/~soni/async-http"))
+ (github anuragsoni/async-http))
 
 (authors "Anurag Soni <anurag@sonianurag.com>")
 
@@ -17,17 +17,17 @@
  (name async_http)
  (synopsis "Async web toolkit")
  (tags
-  (http-server http-client http async ocaml))
+  (http-server http async ocaml))
  (depends
   (ocaml
    (>= 4.08.0))
-  (core
-   (>= 0.13))
-  (async
-   (>= 0.13))
-  ppx_jane
-  ppx_log
-  httpaf
-  faraday
+  shuttle_http
+  (ppx_jane
+   (and
+    (>= v0.14)
+    (< v0.15)))
   (async_ssl
-   (>= 0.13))))
+   (and
+    (>= v0.14)
+    (< v0.15)))
+  ppx_log))
