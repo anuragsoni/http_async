@@ -3,8 +3,8 @@ open Async
 open Async_http
 
 let service =
-  Async_http.Service.create "hello.service" (fun _req _body ->
-      Service.respond_string "Hello World")
+  Async_http.Service.create "hello.service" (fun _req ->
+      return (Response.string "Hello World"))
 ;;
 
 let start_server port accepts () =

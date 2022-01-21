@@ -1,8 +1,9 @@
 open! Core_kernel
+open Shuttle_http
 
-type t = Http.Request.t
+type request = Http.Request.t
 
-let sexp_of_t { Http.Request.headers; meth; scheme; resource; version; _ } =
+let sexp_of_request { Http.Request.headers; meth; scheme; resource; version; _ } =
   [%sexp
     { headers = (Http.Header.to_list headers : (string, string) List.Assoc.t)
     ; meth = (Http.Method.to_string meth : string)
@@ -12,7 +13,14 @@ let sexp_of_t { Http.Request.headers; meth; scheme; resource; version; _ } =
     }]
 ;;
 
-let headers t = Http.Request.headers t
-let meth t = Http.Request.meth t
-let scheme t = Http.Request.scheme t
-let resource t = Http.Request.resource t
+type t =
+  { request : request
+  ; body : Body.Reader.t
+  }
+[@@deriving sexp_of]
+
+let create request body = { request; body }
+let headers t = Http.Request.headers t.request
+let meth t = Http.Request.meth t.request
+let resource t = Http.Request.resource t.request
+let body t = t.body
