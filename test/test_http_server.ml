@@ -22,7 +22,7 @@ let test_post_req_with_fixed_body =
 let%expect_test "test simple server" =
   let open Async_http in
   let stdout = Lazy.force Writer.stdout in
-  let handler req body =
+  let handler (req, body) =
     let%bind () =
       Pipe.iter_without_pushback (Body.Reader.pipe body) ~f:(fun v ->
           Writer.write_line stdout v)
