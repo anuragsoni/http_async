@@ -14,7 +14,6 @@ let test_post_req_with_fixed_body =
   "POST /hello HTTP/1.1\r\n\
    Host: www.example.com   \r\n\
    Content-Length: 5\r\n\
-   Connection: close\r\n\
    \r\n\
    Hello\r\n"
 ;;
@@ -37,7 +36,9 @@ let%expect_test "test simple server" =
         ; version = (Http.Version.to_string (Http.Request.version req) : string)
         }];
     return
-      ( Http.Response.make ~headers:(Http.Header.of_list [ "content-length", "5" ]) ()
+      ( Http.Response.make
+          ~headers:(Http.Header.of_list [ "content-length", "5"; "connection", "close" ])
+          ()
       , Body.Writer.string "World" )
   in
   let%bind reader, write_to_reader = pipe () in
@@ -53,8 +54,7 @@ let%expect_test "test simple server" =
     [%expect
       {|
     Hello
-    ((resource /hello)
-     (headers ((Host www.example.com) (Content-Length 5) (Connection close)))
+    ((resource /hello) (headers ((Host www.example.com) (Content-Length 5)))
      (version HTTP/1.1)) |}]
   in
   let%bind () = Output_channel.close writer in
