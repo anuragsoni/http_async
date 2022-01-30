@@ -21,12 +21,10 @@
  (depends
   (ocaml
    (>= 4.08.0))
-  shuttle_http
+  shuttle
+  shuttle_ssl
+  (http (> 5.0.0))
   (ppx_jane
-   (and
-    (>= v0.14)
-    (< v0.15)))
-  (async_ssl
    (and
     (>= v0.14)
     (< v0.15)))
