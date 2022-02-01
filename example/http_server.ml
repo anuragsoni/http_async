@@ -11,6 +11,8 @@ let handler (_req, _body) =
 
 let start_server port accepts () =
   Shuttle.Connection.listen
+    ~input_buffer_size:0x4000
+    ~output_buffer_size:0x4000
     ~backlog:11_000
     ~max_accepts_per_batch:accepts
     (Tcp.Where_to_listen.of_port port)
