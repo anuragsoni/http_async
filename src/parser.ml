@@ -1,3 +1,4 @@
+open Core_kernel
 open Http
 
 let[@inline always] is_tchar = function
@@ -24,13 +25,13 @@ let[@inline always] is_tchar = function
 
 module Source = struct
   type t =
-    { buffer : string
+    { buffer : Bigstring.t
     ; mutable pos : int
     ; upper_bound : int
     }
 
   let of_bytes ~pos ?len buffer =
-    let buf_len = String.length buffer in
+    let buf_len = Bigstring.length buffer in
     if pos < 0 || pos > buf_len
     then
       invalid_arg
@@ -52,12 +53,12 @@ module Source = struct
     { buffer; pos; upper_bound = pos + len }
   ;;
 
-  let[@inline always] get_unsafe t idx = String.unsafe_get t.buffer (t.pos + idx)
+  let[@inline always] get_unsafe t idx = Bigstring.get t.buffer (t.pos + idx)
 
   let[@inline always] get t idx =
     if idx < 0 || t.pos + idx >= t.upper_bound
     then invalid_arg "Http_parser.Source.get: Index out of bounds";
-    String.unsafe_get t.buffer (t.pos + idx)
+    Bigstring.get t.buffer (t.pos + idx)
   ;;
 
   let[@inline always] advance_unsafe t count = t.pos <- t.pos + count
@@ -87,7 +88,14 @@ module Source = struct
             %d"
            pos
            len);
-    String.sub t.buffer (t.pos + pos) len
+    let b = Bytes.create len in
+    Bigstring.To_bytes.unsafe_blit
+      ~src:t.buffer
+      ~dst:b
+      ~src_pos:(t.pos + pos)
+      ~dst_pos:0
+      ~len;
+    Bytes.unsafe_to_string ~no_mutation_while_string_reachable:b
   ;;
 
   let[@inline always] is_space = function
@@ -109,25 +117,22 @@ module Source = struct
            len);
     let last = ref (t.pos + len - 1) in
     let pos = ref (t.pos + pos) in
-    while is_space (String.unsafe_get t.buffer !pos) do
+    while is_space (Bigstring.get t.buffer !pos) do
       incr pos
     done;
-    while is_space (String.unsafe_get t.buffer !last) do
+    while is_space (Bigstring.get t.buffer !last) do
       decr last
     done;
     let len = !last - !pos + 1 in
-    String.sub t.buffer !pos len
+    let b = Bytes.create len in
+    Bigstring.To_bytes.unsafe_blit ~src:t.buffer ~dst:b ~src_pos:!pos ~dst_pos:0 ~len;
+    Bytes.unsafe_to_string ~no_mutation_while_string_reachable:b
   ;;
 
-  let rec index_rec t ch idx len =
-    if idx = len
-    then -1
-    else if String.unsafe_get t.buffer (t.pos + idx) = ch
-    then idx
-    else index_rec t ch (idx + 1) len
+  let index t ch =
+    let idx = Bigstring.unsafe_find t.buffer ch ~pos:t.pos ~len:(length t) in
+    if idx < 0 then -1 else idx - t.pos
   ;;
-
-  let index t ch = index_rec t ch 0 (length t)
 
   let for_all_is_tchar t ~pos ~len =
     if pos < 0
@@ -142,7 +147,7 @@ module Source = struct
            len);
     let pos = ref (t.pos + pos) in
     let len = t.pos + len in
-    while !pos < len && is_tchar (String.unsafe_get t.buffer !pos) do
+    while !pos < len && is_tchar (Bigstring.get t.buffer !pos) do
       incr pos
     done;
     !pos = len
@@ -224,7 +229,7 @@ let header source =
   then (
     let key = Source.to_string source ~pos:0 ~len:pos in
     Source.advance_unsafe source (pos + 1);
-    while (not (Source.is_empty source)) && Source.get_unsafe source 0 = ' ' do
+    while (not (Source.is_empty source)) && Char.(Source.get_unsafe source 0 = ' ') do
       Source.advance_unsafe source 1
     done;
     let pos = Source.index source '\r' in
@@ -239,7 +244,7 @@ let header source =
 
 let headers =
   let rec loop source acc =
-    if (not (Source.is_empty source)) && Source.get_unsafe source 0 = '\r'
+    if (not (Source.is_empty source)) && Char.(Source.get_unsafe source 0 = '\r')
     then (
       eol source;
       Header.of_list (List.rev acc))
@@ -273,13 +278,13 @@ let chunk_length source =
       incr count;
       match ch with
       | '0' .. '9' as ch when !processing_chunk ->
-        let curr = Char.code ch - Char.code '0' in
+        let curr = Char.to_int ch - Char.to_int '0' in
         length := (!length lsl 4) lor curr
       | 'a' .. 'f' as ch when !processing_chunk ->
-        let curr = Char.code ch - Char.code 'a' + 10 in
+        let curr = Char.to_int ch - Char.to_int 'a' + 10 in
         length := (!length lsl 4) lor curr
       | 'A' .. 'F' as ch when !processing_chunk ->
-        let curr = Char.code ch - Char.code 'A' + 10 in
+        let curr = Char.to_int ch - Char.to_int 'A' + 10 in
         length := (!length lsl 4) lor curr
       | ';' when not !in_chunk_extension ->
         in_chunk_extension := true;
@@ -291,7 +296,7 @@ let chunk_length source =
         then (
           stop := true;
           state := `Partial)
-        else if Source.get source 0 = '\n'
+        else if Char.(Source.get source 0 = '\n')
         then (
           Source.advance source 1;
           stop := true)
