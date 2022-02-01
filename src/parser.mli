@@ -1,3 +1,5 @@
+open! Core_kernel
+
 type error =
   | Partial
   | Msg of string
@@ -14,13 +16,17 @@ type chunk_parser_result =
 (** Attempts to parse a buffer into a HTTP request. If successful, it returns the parsed
     request and an offset value that indicates the starting point of unconsumed content
     left in the buffer. *)
-val parse_request : ?pos:int -> ?len:int -> string -> (Http.Request.t * int, error) result
+val parse_request
+  :  ?pos:int
+  -> ?len:int
+  -> Bigstring.t
+  -> (Http.Request.t * int, error) result
 
-val parse_chunk_length : ?pos:int -> ?len:int -> string -> (int * int, error) result
+val parse_chunk_length : ?pos:int -> ?len:int -> Bigstring.t -> (int * int, error) result
 
 val parse_chunk
   :  ?pos:int
   -> ?len:int
-  -> string
+  -> Bigstring.t
   -> chunk_kind
   -> (chunk_parser_result * int, error) result

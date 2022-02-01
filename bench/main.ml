@@ -20,10 +20,12 @@ let req =
    \r\n"
 ;;
 
+let req = Bigstring.of_string req
+
 open Core_bench
 
 let hex_str = "fffffffe"
-let hex_chunk_size = Printf.sprintf "%s\r\n" hex_str
+let hex_chunk_size = Bigstring.of_string (Printf.sprintf "%s\r\n" hex_str)
 
 let tests =
   [ Bench.Test.create ~name:"H1 (httparse example)" (fun () ->
