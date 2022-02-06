@@ -11,11 +11,7 @@ let pipe () =
 ;;
 
 let test_post_req_with_fixed_body =
-  "POST /hello HTTP/1.1\r\n\
-   Host: www.example.com   \r\n\
-   Content-Length: 5\r\n\
-   \r\n\
-   Hello\r\n"
+  "POST /hello HTTP/1.1\r\nHost: www.example.com   \r\nContent-Length: 5\r\n\r\nHello\r\n"
 ;;
 
 let%expect_test "test simple server" =

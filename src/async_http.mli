@@ -45,16 +45,13 @@ end
 module Server : sig
   type request = Http.Request.t * Body.Reader.t
   type response = Http.Response.t * Body.Writer.t
+  type handler = request -> response Deferred.t
 
   (** [run_server_loop] accepts a HTTP handler, and returns a callback that can be used to
       drive the server loop created via [Shuttle.Connection.listen]. This allows the user
       to customize the [Input_channel] and [Output_channel] and have control over the
       various Server configuration options like [accept_n], [backlog] and more. *)
-  val run_server_loop
-    :  (request -> response Deferred.t)
-    -> Input_channel.t
-    -> Output_channel.t
-    -> unit Deferred.t
+  val run_server_loop : handler -> Input_channel.t -> Output_channel.t -> unit Deferred.t
 end
 
 module Private : sig

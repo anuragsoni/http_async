@@ -8,6 +8,7 @@ let log = Lazy.force Logger.log
 
 type request = Http.Request.t * Body.Reader.t
 type response = Http.Response.t * Body.Writer.t
+type handler = request -> response Deferred.t
 
 let write_response writer res =
   let module Writer = Output_channel in
