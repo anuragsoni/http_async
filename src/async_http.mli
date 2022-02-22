@@ -31,8 +31,11 @@ module Body : sig
     (** [empty] represents a fixed length encoded body of length 0. *)
     val empty : t
 
-    (** [string] creates a fixed length body from the input string. *)
+    (** [string] creates a fixed length body from the input [String.t]. *)
     val string : string -> t
+
+    (** [bigstring] creates a fixed length body from the input [Bigstring.t]. *)
+    val bigstring : Bigstring.t -> t
 
     (** [stream] creates a streaming body writer from the given pipe. Default value of
         [?encoding] is "chunked". The body writer ensures that the payloads will be chunk

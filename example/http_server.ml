@@ -3,10 +3,12 @@ open Async
 open Async_http
 
 let text = String.init 2053 ~f:(fun _ -> 'a')
-let headers = Http.Header.of_list [ "content-length", Int.to_string (String.length text) ]
+
+let text = Bigstring.of_string text
+let headers = Http.Header.of_list [ "content-length", Int.to_string (Bigstring.length text) ]
 
 let handler (_req, _body) =
-  return (Http.Response.make ~headers (), Body.Writer.string text)
+  return (Http.Response.make ~headers (), Body.Writer.bigstring text)
 ;;
 
 let start_server port accepts () =

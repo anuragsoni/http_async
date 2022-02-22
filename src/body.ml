@@ -77,7 +77,8 @@ end
 module Writer = struct
   type kind =
     | Empty
-    | Fixed of string
+    | String of string
+    | Bigstring of Bigstring.t
     | Stream of string Pipe.Reader.t
   [@@deriving sexp_of]
 
@@ -91,7 +92,13 @@ module Writer = struct
   let empty = { encoding = Http.Transfer.Fixed 0L; kind = Empty }
 
   let string x =
-    { encoding = Http.Transfer.Fixed (Int64.of_int (String.length x)); kind = Fixed x }
+    { encoding = Http.Transfer.Fixed (Int64.of_int (String.length x)); kind = String x }
+  ;;
+
+  let bigstring x =
+    { encoding = Http.Transfer.Fixed (Int64.of_int (Bigstring.length x))
+    ; kind = Bigstring x
+    }
   ;;
 
   let stream ?(encoding = Http.Transfer.Chunked) x = { encoding; kind = Stream x }
@@ -129,8 +136,11 @@ module Writer = struct
       Deferred.create (fun ivar ->
           match t.kind with
           | Empty -> Ivar.fill ivar ()
-          | Fixed x ->
+          | String x ->
             Output_channel.write writer x;
+            Output_channel.flush writer >>> fun () -> Ivar.fill ivar ()
+          | Bigstring b ->
+            Output_channel.write_bigstring writer b;
             Output_channel.flush writer >>> fun () -> Ivar.fill ivar ()
           | Stream xs ->
             let write_chunk = make_writer t in
