@@ -28,6 +28,7 @@ type t = request -> response Deferred.t
 let body request = snd request
 let header request key = Http.Header.get (Http.Request.headers (fst request)) key
 let resource request = Http.Request.resource (fst request)
+let meth request = Http.Request.meth (fst request)
 
 let header_multi request key =
   Http.Header.get_multi (Http.Request.headers (fst request)) key

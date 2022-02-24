@@ -55,6 +55,21 @@ module Service : sig
   (** [resource] returns the path and query for a given request. *)
   val resource : request -> string
 
+  (** [meth] returns the HTTP verb for a given request. *)
+  val meth
+    :  request
+    -> [ `GET
+       | `POST
+       | `HEAD
+       | `DELETE
+       | `PATCH
+       | `PUT
+       | `OPTIONS
+       | `TRACE
+       | `CONNECT
+       | `Other of string
+       ]
+
   (** [body] returns the HTTP request body for a given request. *)
   val body : request -> Body.Reader.t
 

@@ -2,9 +2,11 @@ open Core
 open Async
 open Async_http
 
-let text = String.init 2053 ~f:(fun _ -> 'a')
-let text = Bigstring.of_string text
-let handler _request = Service.respond_bigstring text
+let handler request =
+  match Service.resource request with
+  | "/" -> Service.respond_string "Hello World"
+  | _ -> Service.respond_string ~headers:[ "connection", "close" ] ~status:`Not_found ""
+;;
 
 let start_server port accepts () =
   Shuttle.Connection.listen
