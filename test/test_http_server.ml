@@ -17,25 +17,16 @@ let test_post_req_with_fixed_body =
 let%expect_test "test simple server" =
   let open Async_http in
   let stdout = Lazy.force Writer.stdout in
-  let handler (req, body) =
+  let handler request =
+    let body = Service.body request in
     let%bind () =
       Pipe.iter_without_pushback (Body.Reader.pipe body) ~f:(fun v ->
           Writer.write_line stdout v)
     in
-    Writer.write_sexp
-      ~hum:true
-      stdout
-      [%sexp
-        { resource = (Http.Request.resource req : string)
-        ; headers =
-            (Http.Header.to_list (Http.Request.headers req) : (string * string) list)
-        ; version = (Http.Version.to_string (Http.Request.version req) : string)
-        }];
-    return
-      ( Http.Response.make
-          ~headers:(Http.Header.of_list [ "content-length", "5"; "connection", "close" ])
-          ()
-      , Body.Writer.string "World" )
+    Writer.write_sexp ~hum:true stdout (Service.sexp_of_request request);
+    Service.respond_string
+      ~headers:[ "content-length", "5"; "connection", "close" ]
+      "World"
   in
   let%bind reader, write_to_reader = pipe () in
   let%bind read_from_writer, writer = pipe () in
@@ -50,8 +41,9 @@ let%expect_test "test simple server" =
     [%expect
       {|
     Hello
-    ((resource /hello) (headers ((Host www.example.com) (Content-Length 5)))
-     (version HTTP/1.1)) |}]
+    (((meth POST) (headers ((Host www.example.com) (Content-Length 5)))
+      (version HTTP/1.1) (resource /hello))
+     ((encoding (Fixed 5)) (reader <opaque>))) |}]
   in
   let%bind () = Output_channel.close writer in
   let%bind () =

@@ -44,17 +44,54 @@ module Body : sig
   end
 end
 
-(** Low level HTTP 1.1 server implementation for OCaml. *)
-module Server : sig
-  type request = Http.Request.t * Body.Reader.t
-  type response = Http.Response.t * Body.Writer.t
-  type handler = request -> response Deferred.t
+(** [Service] is the core abstraction that represents an HTTP server within async_http.*)
+module Service : sig
+  type request [@@deriving sexp_of]
+  type response [@@deriving sexp_of]
 
-  (** [run_server_loop] accepts a HTTP handler, and returns a callback that can be used to
+  (** [t] is a function that takes a HTTP request and returns a deferred HTTP response. *)
+  type t = request -> response Deferred.t
+
+  (** [body] returns the HTTP request body for a given request. *)
+  val body : request -> Body.Reader.t
+
+  (** [header request key] returns the last header value associates with [key] if one
+      exists. *)
+  val header : request -> string -> string option
+
+  (** [header_multi request key] returns a list of all header values associated with
+      [key]. *)
+  val header_multi : request -> string -> string list
+
+  (** [respond_string] creates a new fixed length encoded response from the user provided
+      string. If the user provided headers don't contain a Content-Length header, one is
+      added with the value set to the string's length. *)
+  val respond_string
+    :  ?headers:(string * string) list
+    -> ?status:Http.Status.t
+    -> string
+    -> response Deferred.t
+
+  (** [respond_bigstring] creates a new fixed length encoded response from the user
+      provided [Bigstring.t]. If the user provided headers don't contain a Content-Length
+      header, one is added with the value set to the bigstring's length. *)
+  val respond_bigstring
+    :  ?headers:(string * string) list
+    -> ?status:Http.Status.t
+    -> Bigstring.t
+    -> response Deferred.t
+end
+
+module Server : sig
+  (** [run_server_loop] accepts a HTTP service, and returns a callback that can be used to
       drive the server loop created via [Shuttle.Connection.listen]. This allows the user
       to customize the [Input_channel] and [Output_channel] and have control over the
       various Server configuration options like [accept_n], [backlog] and more. *)
-  val run_server_loop : handler -> Input_channel.t -> Output_channel.t -> unit Deferred.t
+  val run_server_loop
+    :  Service.t
+    -> Input_channel.t
+    -> Output_channel.t
+    -> unit Deferred.t
 end
 
 module Private : sig

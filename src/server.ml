@@ -10,7 +10,7 @@ type request = Http.Request.t * Body.Reader.t
 type response = Http.Response.t * Body.Writer.t
 type handler = request -> response Deferred.t
 
-let write_response writer res =
+let write_response writer encoding res =
   let module Writer = Output_channel in
   let open Http in
   Writer.write writer (Version.to_string (Response.version res));
@@ -18,13 +18,14 @@ let write_response writer res =
   Writer.write writer (Status.to_string (Response.status res));
   Writer.write_char writer ' ';
   Writer.write writer "\r\n";
+  let headers = Http.Header.add_transfer_encoding (Response.headers res) encoding in
   Header.iter
     (fun key data ->
       Writer.write writer key;
       Writer.write writer ": ";
       Writer.write writer data;
       Writer.write writer "\r\n")
-    (Response.headers res);
+    headers;
   Writer.write writer "\r\n"
 ;;
 
@@ -46,7 +47,7 @@ let run_server_loop handle_request reader writer =
       let keep_alive =
         Http.Request.is_keep_alive req && Http.Response.is_keep_alive res
       in
-      write_response writer res;
+      write_response writer (Body.Writer.encoding res_body) res;
       let%bind () = Body.Writer.Private.write res_body writer in
       let%bind () = Body.Reader.drain req_body in
       if keep_alive then loop reader writer handle_request else Deferred.unit

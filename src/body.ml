@@ -11,7 +11,7 @@ type encoding = Http.Transfer.encoding =
 module Reader = struct
   type t =
     { encoding : encoding
-    ; reader : string Pipe.Reader.t
+    ; reader : (string Pipe.Reader.t[@sexp.opaque])
     }
   [@@deriving sexp_of]
 
@@ -79,7 +79,7 @@ module Writer = struct
     | Empty
     | String of string
     | Bigstring of Bigstring.t
-    | Stream of string Pipe.Reader.t
+    | Stream of (string Pipe.Reader.t[@sexp.opaque])
   [@@deriving sexp_of]
 
   type t =
