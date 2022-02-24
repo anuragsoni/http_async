@@ -98,6 +98,14 @@ module Service : sig
     -> ?status:Http.Status.t
     -> Bigstring.t
     -> response Deferred.t
+
+  (** [respond_stream] creates a new streaming response. The data is chunk-encoded before
+      its sent over the wire. *)
+  val respond_stream
+    :  ?headers:(string * string) list
+    -> ?status:Http.Status.t
+    -> string Pipe.Reader.t
+    -> response Deferred.t
 end
 
 module Server : sig
