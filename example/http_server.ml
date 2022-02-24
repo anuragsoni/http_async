@@ -23,17 +23,16 @@ let start_server port accepts () =
   Deferred.never ()
 ;;
 
-let () =
+let command =
   Command.async
     ~summary:"Start a hello world Async server"
-    Command.Param.(
-      map
-        (both
-           (flag
-              "-p"
-              (optional_with_default 8080 int)
-              ~doc:"int Source port to listen on")
-           (flag "-a" (optional_with_default 1 int) ~doc:"int Maximum accepts per batch"))
-        ~f:(fun (port, accepts) () -> start_server port accepts ()))
-  |> Command.run
+    Command.Let_syntax.(
+      let%map_open port =
+        flag "-p" ~doc:"int Source port to listen on" (optional_with_default 8080 int)
+      and accepts =
+        flag "-a" ~doc:"int Maximum accepts per batch" (optional_with_default 1 int)
+      in
+      start_server port accepts)
 ;;
+
+let () = Command.run command
