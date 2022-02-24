@@ -1,10 +1,7 @@
 open! Core
 open! Async
 open! Shuttle
-open Ppx_log_async.No_global
 module Logger = Log.Make_global ()
-
-let log = Lazy.force Logger.log
 
 type request = Http.Request.t * Body.Reader.t
 type response = Http.Response.t * Body.Writer.t
@@ -38,8 +35,10 @@ let run_server_loop handle_request reader writer =
       | `Ok -> loop reader writer handle_request
       | `Eof | `Buffer_is_full -> Deferred.unit)
     | Error (Msg msg) ->
-      [%log.error log "Error while parsing http request: %S" msg];
-      Deferred.unit
+      Logger.error "request parser: %s" msg;
+      let response = Http.Response.make ~status:`Bad_request () in
+      write_response writer (Http.Transfer.Fixed 0L) response;
+      Output_channel.flush writer
     | Ok (req, consumed) ->
       Input_channel.consume reader consumed;
       let req_body = Body.Reader.Private.create req reader in
