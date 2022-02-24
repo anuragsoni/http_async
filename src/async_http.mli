@@ -110,6 +110,22 @@ module Server : sig
     -> Input_channel.t
     -> Output_channel.t
     -> unit Deferred.t
+
+  (** [run] sets up a [Tcp.Server.t] and drives the HTTP server loop with the user
+      provided [Service.t]. *)
+  val run
+    :  ?where_to_listen:Tcp.Where_to_listen.inet
+    -> ?max_connections:int
+    -> ?max_accepts_per_batch:int
+    -> ?backlog:int
+    -> ?socket:([ `Unconnected ], Socket.Address.Inet.t) Socket.t
+    -> ?initial_buffer_size:int
+    -> Service.t
+    -> unit Deferred.t
+
+  (** [run_command] is similar to [run] but instead returns an [Async.Command.t] that can
+      be used to start the async event loop from a program's entrypoint. *)
+  val run_command : ?readme:(unit -> string) -> summary:string -> Service.t -> Command.t
 end
 
 module Private : sig

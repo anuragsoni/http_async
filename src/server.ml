@@ -53,3 +53,65 @@ let run_server_loop handle_request reader writer =
   in
   loop reader writer handle_request
 ;;
+
+let run
+    ?(where_to_listen = Tcp.Where_to_listen.of_port 8080)
+    ?max_connections
+    ?(max_accepts_per_batch = 64)
+    ?backlog
+    ?socket
+    ?initial_buffer_size
+    service
+  =
+  let%bind server =
+    Shuttle.Connection.listen
+      ?input_buffer_size:initial_buffer_size
+      ?output_buffer_size:initial_buffer_size
+      ?max_connections
+      ?backlog
+      ?socket
+      ~max_accepts_per_batch
+      where_to_listen
+      ~on_handler_error:`Raise
+      ~f:(fun _addr reader writer -> run_server_loop service reader writer)
+  in
+  Tcp.Server.close_finished_and_handlers_determined server
+;;
+
+let run_command ?readme ~summary service =
+  Command.async
+    ~summary
+    ?readme
+    Command.Let_syntax.(
+      let%map_open port =
+        flag "-port" ~doc:"int Source port to listen on" (optional_with_default 8080 int)
+      and max_connections =
+        flag
+          "-max-connections"
+          ~doc:"int Maximum number of active connections"
+          (optional int)
+      and max_accepts_per_batch =
+        flag
+          "-max-accepts-per-batch"
+          ~doc:"int Maximum number of connections to accept per Unix.accept call."
+          (optional_with_default 64 int)
+      and backlog =
+        flag
+          "-backlog"
+          ~doc:"int Number of clients that can have a pending connection."
+          (optional int)
+      and initial_buffer_size =
+        flag
+          "-initial-buffer-size"
+          ~doc:"int Initial size of the Read and Write buffers used by the server."
+          (optional int)
+      in
+      fun () ->
+        run
+          ~where_to_listen:(Tcp.Where_to_listen.of_port port)
+          ~max_accepts_per_batch
+          ?max_connections
+          ?backlog
+          ?initial_buffer_size
+          service)
+;;
