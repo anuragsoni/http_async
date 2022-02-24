@@ -52,6 +52,9 @@ module Service : sig
   (** [t] is a function that takes a HTTP request and returns a deferred HTTP response. *)
   type t = request -> response Deferred.t
 
+  (** [resource] returns the path and query for a given request. *)
+  val resource : request -> string
+
   (** [body] returns the HTTP request body for a given request. *)
   val body : request -> Body.Reader.t
 
