@@ -129,7 +129,7 @@ module Server : sig
     -> ?socket:([ `Unconnected ], Socket.Address.Inet.t) Socket.t
     -> ?initial_buffer_size:int
     -> Service.t
-    -> unit Deferred.t
+    -> (Socket.Address.Inet.t, int) Tcp.Server.t Deferred.t
 
   (** [run_command] is similar to [run] but instead returns an [Async.Command.t] that can
       be used to start the async event loop from a program's entrypoint. *)

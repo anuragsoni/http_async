@@ -63,19 +63,16 @@ let run
     ?initial_buffer_size
     service
   =
-  let%bind server =
-    Shuttle.Connection.listen
-      ?input_buffer_size:initial_buffer_size
-      ?output_buffer_size:initial_buffer_size
-      ?max_connections
-      ?backlog
-      ?socket
-      ~max_accepts_per_batch
-      where_to_listen
-      ~on_handler_error:`Raise
-      ~f:(fun _addr reader writer -> run_server_loop service reader writer)
-  in
-  Tcp.Server.close_finished_and_handlers_determined server
+  Shuttle.Connection.listen
+    ?input_buffer_size:initial_buffer_size
+    ?output_buffer_size:initial_buffer_size
+    ?max_connections
+    ?backlog
+    ?socket
+    ~max_accepts_per_batch
+    where_to_listen
+    ~on_handler_error:`Raise
+    ~f:(fun _addr reader writer -> run_server_loop service reader writer)
 ;;
 
 let run_command ?readme ~summary service =
@@ -107,11 +104,14 @@ let run_command ?readme ~summary service =
           (optional int)
       in
       fun () ->
-        run
-          ~where_to_listen:(Tcp.Where_to_listen.of_port port)
-          ~max_accepts_per_batch
-          ?max_connections
-          ?backlog
-          ?initial_buffer_size
-          service)
+        let%bind.Deferred server =
+          run
+            ~where_to_listen:(Tcp.Where_to_listen.of_port port)
+            ~max_accepts_per_batch
+            ?max_connections
+            ?backlog
+            ?initial_buffer_size
+            service
+        in
+        Tcp.Server.close_finished_and_handlers_determined server)
 ;;
