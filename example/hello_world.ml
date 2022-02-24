@@ -1,5 +1,5 @@
-open Core
-open Async
+open! Core
+open! Async
 open Async_http
 
 let handler request =
@@ -8,21 +8,12 @@ let handler request =
   | _ -> Service.respond_string ~headers:[ "connection", "close" ] ~status:`Not_found ""
 ;;
 
-let start_server port accepts () =
+let start_server port () =
   Shuttle.Connection.listen
-    ~input_buffer_size:0x4000
-    ~output_buffer_size:0x4000
-    ~backlog:11_000
-    ~max_accepts_per_batch:accepts
     (Tcp.Where_to_listen.of_port port)
     ~on_handler_error:`Raise
     ~f:(fun _addr reader writer -> Server.run_server_loop handler reader writer)
-  >>= fun server ->
-  Deferred.forever () (fun () ->
-      after Time.Span.(of_sec 0.5)
-      >>| fun () ->
-      Log.Global.printf "Active connections: %d" (Tcp.Server.num_connections server));
-  Deferred.never ()
+  >>= fun _server -> Deferred.never ()
 ;;
 
 let command =
@@ -31,10 +22,8 @@ let command =
     Command.Let_syntax.(
       let%map_open port =
         flag "-p" ~doc:"int Source port to listen on" (optional_with_default 8080 int)
-      and accepts =
-        flag "-a" ~doc:"int Maximum accepts per batch" (optional_with_default 1 int)
       in
-      start_server port accepts)
+      start_server port)
 ;;
 
 let () = Command.run command
