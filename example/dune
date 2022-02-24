@@ -1,5 +1,5 @@
 (executables
- (names http_server)
+ (names hello_world)
  (preprocess
   (pps ppx_jane))
  (libraries core async shuttle shuttle_ssl async_http))
