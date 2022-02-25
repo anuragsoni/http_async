@@ -36,21 +36,21 @@ let header_multi request key =
 
 let respond_string ?(headers = []) ?(status = `OK) body =
   let body = Body.Writer.string body in
-  let headers = Http.Header.of_list headers in
+  let headers = Http.Header.of_list_rev headers in
   let response = Http.Response.make ~status ~headers ~version:`HTTP_1_1 () in
   return (response, body)
 ;;
 
 let respond_bigstring ?(headers = []) ?(status = `OK) body =
   let body = Body.Writer.bigstring body in
-  let headers = Http.Header.of_list headers in
+  let headers = Http.Header.of_list_rev headers in
   let response = Http.Response.make ~status ~headers ~version:`HTTP_1_1 () in
   return (response, body)
 ;;
 
 let respond_stream ?(headers = []) ?(status = `OK) body =
   let body = Body.Writer.stream body in
-  let headers = Http.Header.of_list headers in
+  let headers = Http.Header.of_list_rev headers in
   let response = Http.Response.make ~status ~headers ~version:`HTTP_1_1 () in
   return (response, body)
 ;;

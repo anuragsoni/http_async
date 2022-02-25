@@ -15,14 +15,30 @@ let write_response writer encoding res =
   Writer.write writer (Status.to_string (Response.status res));
   Writer.write_char writer ' ';
   Writer.write writer "\r\n";
-  let headers = Http.Header.add_transfer_encoding (Response.headers res) encoding in
+  let headers = Response.headers res in
   Header.iter
     (fun key data ->
-      Writer.write writer key;
-      Writer.write writer ": ";
-      Writer.write writer data;
-      Writer.write writer "\r\n")
+      (* TODO: Should this raise an exception if the user provides invalid set of headers,
+         i.e. multiple content-lengths, invalid transfer-encoding etc? *)
+      if not
+           (String.Caseless.equal key "content-length"
+           || String.Caseless.equal key "transfer-encoding")
+      then (
+        Writer.write writer key;
+        Writer.write writer ": ";
+        Writer.write writer data;
+        Writer.write writer "\r\n"))
     headers;
+  (match encoding with
+  | Http.Transfer.Fixed len ->
+    Writer.write writer "content-length: ";
+    Writer.write writer (Int64.to_string len);
+    Writer.write writer "\r\n"
+  | Http.Transfer.Chunked -> Writer.write writer "content-length: chunked\r\n"
+  | Http.Transfer.Unknown ->
+    (* TODO: This situation shouldn't happen but maybe we should deal with this
+       somehow? *)
+    ());
   Writer.write writer "\r\n"
 ;;
 
