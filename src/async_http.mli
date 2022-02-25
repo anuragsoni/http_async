@@ -50,7 +50,7 @@ module Service : sig
   type response [@@deriving sexp_of]
 
   (** [t] is a function that takes a HTTP request and returns a deferred HTTP response. *)
-  type t = request -> response Deferred.t
+  type ('req, 'res) t = 'req -> 'res Deferred.t
 
   (** [resource] returns the path and query for a given request. *)
   val resource : request -> string
@@ -114,7 +114,7 @@ module Server : sig
       to customize the [Input_channel] and [Output_channel] and have control over the
       various Server configuration options like [accept_n], [backlog] and more. *)
   val run_server_loop
-    :  Service.t
+    :  (Service.request, Service.response) Service.t
     -> Input_channel.t
     -> Output_channel.t
     -> unit Deferred.t
@@ -128,12 +128,16 @@ module Server : sig
     -> ?backlog:int
     -> ?socket:([ `Unconnected ], Socket.Address.Inet.t) Socket.t
     -> ?initial_buffer_size:int
-    -> Service.t
+    -> (Service.request, Service.response) Service.t
     -> (Socket.Address.Inet.t, int) Tcp.Server.t Deferred.t
 
   (** [run_command] is similar to [run] but instead returns an [Async.Command.t] that can
       be used to start the async event loop from a program's entrypoint. *)
-  val run_command : ?readme:(unit -> string) -> summary:string -> Service.t -> Command.t
+  val run_command
+    :  ?readme:(unit -> string)
+    -> summary:string
+    -> (Service.request, Service.response) Service.t
+    -> Command.t
 end
 
 module Private : sig

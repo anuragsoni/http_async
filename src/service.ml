@@ -23,7 +23,7 @@ let sexp_of_http_response { Http.Response.headers; version; status; _ } =
 
 type request = http_request * Body.Reader.t [@@deriving sexp_of]
 type response = http_response * Body.Writer.t [@@deriving sexp_of]
-type t = request -> response Deferred.t
+type ('req, 'res) t = 'req -> 'res Deferred.t
 
 let body request = snd request
 let header request key = Http.Header.get (Http.Request.headers (fst request)) key
