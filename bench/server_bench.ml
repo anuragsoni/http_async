@@ -54,4 +54,4 @@ let command =
         Tcp.Server.close_finished_and_handlers_determined server)
 ;;
 
-let () = Command.run command
+let () = Command_unix.run command

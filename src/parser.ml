@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Http
 
 let[@inline always] is_tchar = function

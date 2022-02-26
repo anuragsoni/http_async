@@ -1,11 +1,11 @@
 (executable
  (name parser_bench)
  (modules parser_bench)
- (libraries core_bench async_http))
+ (libraries core_bench core_unix.command_unix async_http))
 
 (executable
  (name server_bench)
  (modules server_bench)
  (preprocess
   (pps ppx_jane))
- (libraries core async async_http))
+ (libraries core core_unix.command_unix async async_http))

@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 
 type http_request = Http.Request.t
