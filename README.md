@@ -1,6 +1,6 @@
 # Async_http
 
-Simple HTTP server for async applications.
+Simple HTTP server for async applications. This library implements HTTP 1.1 specification including support for pipelined connections.
 
 ### Hello World
 
