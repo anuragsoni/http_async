@@ -35,7 +35,7 @@ let write_response writer encoding res =
     Writer.write writer "content-length: ";
     Writer.write writer (Int64.to_string len);
     Writer.write writer "\r\n"
-  | Http.Transfer.Chunked -> Writer.write writer "content-length: chunked\r\n"
+  | Http.Transfer.Chunked -> Writer.write writer "transfer-encoding: chunked\r\n"
   | Http.Transfer.Unknown ->
     (* TODO: This situation shouldn't happen but maybe we should deal with this
        somehow? *)
