@@ -22,7 +22,6 @@
   (ocaml
    (>= 4.08.0))
   shuttle
-  shuttle_ssl
   (http (> 5.0.0))
   (ppx_jane
    (and
