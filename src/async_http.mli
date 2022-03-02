@@ -2,48 +2,6 @@ open! Core
 open! Async
 open! Shuttle
 
-(** Bodies for HTTP requests and responses, with support for streaming. *)
-module Body : sig
-  (** Streaming body reader. *)
-  module Reader : sig
-    type t [@@deriving sexp_of]
-
-    (** [encoding] returns whether the body is a chunk encoded payload, or a fixed length
-        payload. *)
-    val encoding : t -> Http.Transfer.encoding
-
-    (** [pipe] creates an async pipe and returns its reader end. This can be used for
-        consuming a request body using the full API set provided by [Async_kernel.Pipe]. *)
-    val pipe : t -> string Pipe.Reader.t
-
-    (** [drain] will read chunks of the HTTP body and discard them. *)
-    val drain : t -> unit Deferred.t
-  end
-
-  (** Body writer with support for streaming. *)
-  module Writer : sig
-    type t [@@deriving sexp_of]
-
-    (** [encoding] returns whether the body is a chunk encoded payload, or a fixed length
-        payload. *)
-    val encoding : t -> Http.Transfer.encoding
-
-    (** [empty] represents a fixed length encoded body of length 0. *)
-    val empty : t
-
-    (** [string] creates a fixed length body from the input [String.t]. *)
-    val string : string -> t
-
-    (** [bigstring] creates a fixed length body from the input [Bigstring.t]. *)
-    val bigstring : Bigstring.t -> t
-
-    (** [stream] creates a streaming body writer from the given pipe. Default value of
-        [?encoding] is "chunked". The body writer ensures that the payloads will be chunk
-        encoded when using an encoding value of chunked. *)
-    val stream : ?encoding:Http.Transfer.encoding -> string Pipe.Reader.t -> t
-  end
-end
-
 (** [Service] is the core abstraction that represents an HTTP server within async_http.*)
 module Service : sig
   type request [@@deriving sexp_of]
@@ -71,7 +29,7 @@ module Service : sig
        ]
 
   (** [body] returns the HTTP request body for a given request. *)
-  val body : request -> Body.Reader.t
+  val body : request -> string Pipe.Reader.t
 
   (** [header request key] returns the last header value associates with [key] if one
       exists. *)

@@ -20,8 +20,7 @@ let%expect_test "test simple server" =
   let handler request =
     let body = Service.body request in
     let%bind () =
-      Pipe.iter_without_pushback (Body.Reader.pipe body) ~f:(fun v ->
-          Writer.write_line stdout v)
+      Pipe.iter_without_pushback body ~f:(fun v -> Writer.write_line stdout v)
     in
     Writer.write_sexp ~hum:true stdout (Service.sexp_of_request request);
     Service.respond_string

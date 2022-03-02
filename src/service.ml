@@ -25,7 +25,7 @@ type request = http_request * Body.Reader.t [@@deriving sexp_of]
 type response = http_response * Body.Writer.t [@@deriving sexp_of]
 type ('req, 'res) t = 'req -> 'res Deferred.t
 
-let body request = snd request
+let body request = Body.Reader.pipe (snd request)
 let header request key = Http.Header.get (Http.Request.headers (fst request)) key
 let resource request = Http.Request.resource (fst request)
 let meth request = Http.Request.meth (fst request)
