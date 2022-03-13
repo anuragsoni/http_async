@@ -7,6 +7,7 @@ module Logger = Log.Make_global ()
 type request = Http.Request.t * Body.Reader.t
 type response = Http.Response.t * Body.Writer.t
 type handler = request -> response Deferred.t
+type error_handler = ?exn:Exn.t -> Http.Status.t -> response Deferred.t
 
 let write_response writer encoding res =
   let module Writer = Output_channel in
@@ -43,32 +44,55 @@ let write_response writer encoding res =
   Writer.write writer "\r\n"
 ;;
 
-let run_server_loop handle_request reader writer =
+let default_error_handler ?exn:_ status =
+  Service.respond_string
+    ~headers:[ "connection", "close"; "content-length", "0" ]
+    ~status
+    ""
+;;
+
+let run_server_loop ?(error_handler = default_error_handler) handle_request reader writer =
+  let monitor = Monitor.create () in
+  let finished = Ivar.create () in
   let rec loop reader writer handle_request =
     let view = Input_channel.view reader in
     match Parser.parse_request view.buf ~pos:view.pos ~len:view.len with
     | Error Partial ->
-      (match%bind Input_channel.refill reader with
+      Input_channel.refill reader
+      >>> (function
       | `Ok -> loop reader writer handle_request
-      | `Eof | `Buffer_is_full -> Deferred.unit)
+      | `Eof | `Buffer_is_full -> Ivar.fill finished ())
     | Error (Msg msg) ->
-      Logger.error "request parser: %s" msg;
-      let response = Http.Response.make ~status:`Bad_request () in
-      write_response writer (Http.Transfer.Fixed 0L) response;
-      Output_channel.flush writer
+      Logger.error "Error while parsing HTTP request: %s" msg;
+      error_handler `Bad_request
+      >>> fun (res, res_body) ->
+      write_response writer (Body.Writer.encoding res_body) res;
+      Body.Writer.Private.write res_body writer
+      >>> fun () -> Output_channel.schedule_flush writer
     | Ok (req, consumed) ->
       Input_channel.consume reader consumed;
       let req_body = Body.Reader.Private.create req reader in
-      let%bind res, res_body = handle_request (req, req_body) in
+      handle_request (req, req_body)
+      >>> fun (res, res_body) ->
       let keep_alive =
         Http.Request.is_keep_alive req && Http.Response.is_keep_alive res
       in
       write_response writer (Body.Writer.encoding res_body) res;
-      let%bind () = Body.Writer.Private.write res_body writer in
-      let%bind () = Body.Reader.drain req_body in
-      if keep_alive then loop reader writer handle_request else Deferred.unit
+      Body.Writer.Private.write res_body writer
+      >>> fun () ->
+      Body.Reader.drain req_body
+      >>> fun () ->
+      if keep_alive then loop reader writer handle_request else Ivar.fill finished ()
   in
-  loop reader writer handle_request
+  (Monitor.detach_and_get_next_error monitor
+  >>> fun exn ->
+  error_handler ~exn `Internal_server_error
+  >>> fun (res, res_body) ->
+  write_response writer (Body.Writer.encoding res_body) res;
+  Body.Writer.Private.write res_body writer >>> fun () -> Ivar.fill finished ());
+  Scheduler.within ~priority:Priority.Normal ~monitor (fun () ->
+      loop reader writer handle_request);
+  Ivar.read finished
 ;;
 
 let run
@@ -78,6 +102,7 @@ let run
     ?backlog
     ?socket
     ?initial_buffer_size
+    ?error_handler
     service
   =
   Shuttle.Connection.listen
@@ -89,10 +114,10 @@ let run
     ~max_accepts_per_batch
     where_to_listen
     ~on_handler_error:`Raise
-    ~f:(fun _addr reader writer -> run_server_loop service reader writer)
+    ~f:(fun _addr reader writer -> run_server_loop ?error_handler service reader writer)
 ;;
 
-let run_command ?readme ~summary service =
+let run_command ?readme ?error_handler ~summary service =
   Command.async
     ~summary
     ?readme
@@ -123,6 +148,7 @@ let run_command ?readme ~summary service =
       fun () ->
         let%bind.Deferred server =
           run
+            ?error_handler
             ~where_to_listen:(Tcp.Where_to_listen.of_port port)
             ~max_accepts_per_batch
             ?max_connections

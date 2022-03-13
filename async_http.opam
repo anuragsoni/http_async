@@ -13,7 +13,6 @@ depends: [
   "shuttle"
   "http" {> "5.0.0"}
   "ppx_jane" {>= "v0.14" & < "v0.15"}
-  "ppx_log"
   "odoc" {with-doc}
 ]
 build: [
