@@ -1,5 +1,5 @@
 (library
  (public_name async_http)
  (preprocess
-  (pps ppx_jane ppx_log))
+  (pps ppx_jane))
  (libraries shuttle http async_kernel.eager_deferred))

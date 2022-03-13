@@ -67,12 +67,15 @@ module Service : sig
 end
 
 module Server : sig
+  type error_handler = ?exn:Exn.t -> Http.Status.t -> Service.response Deferred.t
+
   (** [run_server_loop] accepts a HTTP service, and returns a callback that can be used to
       drive the server loop created via [Shuttle.Connection.listen]. This allows the user
       to customize the [Input_channel] and [Output_channel] and have control over the
       various Server configuration options like [accept_n], [backlog] and more. *)
   val run_server_loop
-    :  (Service.request, Service.response) Service.t
+    :  ?error_handler:error_handler
+    -> (Service.request, Service.response) Service.t
     -> Input_channel.t
     -> Output_channel.t
     -> unit Deferred.t
@@ -86,6 +89,7 @@ module Server : sig
     -> ?backlog:int
     -> ?socket:([ `Unconnected ], Socket.Address.Inet.t) Socket.t
     -> ?initial_buffer_size:int
+    -> ?error_handler:error_handler
     -> (Service.request, Service.response) Service.t
     -> (Socket.Address.Inet.t, int) Tcp.Server.t Deferred.t
 
@@ -93,6 +97,7 @@ module Server : sig
       be used to start the async event loop from a program's entrypoint. *)
   val run_command
     :  ?readme:(unit -> string)
+    -> ?error_handler:error_handler
     -> summary:string
     -> (Service.request, Service.response) Service.t
     -> Command.t
