@@ -117,7 +117,7 @@ let run
     ~f:(fun _addr reader writer -> run_server_loop ?error_handler service reader writer)
 ;;
 
-let run_command ?readme ?error_handler ~summary service =
+let run_command ?(interrupt = Deferred.never ()) ?readme ?error_handler ~summary service =
   Command.async
     ~summary
     ?readme
@@ -156,5 +156,12 @@ let run_command ?readme ?error_handler ~summary service =
             ?initial_buffer_size
             service
         in
-        Tcp.Server.close_finished_and_handlers_determined server)
+        choose
+          [ choice interrupt (fun () -> `Shutdown)
+          ; choice (Tcp.Server.close_finished_and_handlers_determined server) (fun () ->
+                `Closed)
+          ]
+        >>= function
+        | `Shutdown -> Tcp.Server.close ~close_existing_connections:true server
+        | `Closed -> Deferred.unit)
 ;;

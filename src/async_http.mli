@@ -94,9 +94,11 @@ module Server : sig
     -> (Socket.Address.Inet.t, int) Tcp.Server.t Deferred.t
 
   (** [run_command] is similar to [run] but instead returns an [Async.Command.t] that can
-      be used to start the async event loop from a program's entrypoint. *)
+      be used to start the async event loop from a program's entrypoint. If [interrupt] is
+      provided, the server will be stopped when [interrupt] is fulfilled. *)
   val run_command
-    :  ?readme:(unit -> string)
+    :  ?interrupt:unit Deferred.t
+    -> ?readme:(unit -> string)
     -> ?error_handler:error_handler
     -> summary:string
     -> Service.t
