@@ -2,7 +2,6 @@ open! Core
 open! Async
 open! Shuttle
 open Eager_deferred.Use
-module Logger = Log.Make_global ()
 
 type request = Http.Request.t * Body.Reader.t
 type response = Http.Response.t * Body.Writer.t

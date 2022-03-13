@@ -1,6 +1,7 @@
 open! Core
 open! Async
 open! Shuttle
+module Logger : Log.Global_intf
 
 (** [Service] is the core abstraction that represents an HTTP server within async_http.*)
 module Service : sig
