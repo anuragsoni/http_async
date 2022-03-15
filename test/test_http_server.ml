@@ -51,3 +51,48 @@ let%expect_test "test simple server" =
   [%expect
     {| "HTTP/1.1 200 OK \r\nconnection: close\r\ncontent-length: 5\r\n\r\nWorld" |}]
 ;;
+
+let%expect_test "test_default_error_handler" =
+  let stdout = Lazy.force Writer.stdout in
+  let service _request = failwith "ERROR" in
+  let%bind reader, write_to_reader = pipe () in
+  let%bind read_from_writer, writer = pipe () in
+  let reader_pipe = Input_channel.pipe read_from_writer in
+  let finished = Ivar.create () in
+  (Async_http.Server.run_server_loop service reader writer
+  >>> fun () -> Ivar.fill finished ());
+  Output_channel.write write_to_reader test_post_req_with_fixed_body;
+  Output_channel.schedule_flush write_to_reader;
+  let%bind () = Ivar.read finished in
+  let%bind () = Output_channel.close writer in
+  let%bind () =
+    Pipe.iter_without_pushback reader_pipe ~f:(fun chunk ->
+        Writer.writef stdout "%S" chunk)
+  in
+  [%expect
+    {| "HTTP/1.1 500 Internal Server Error \r\nconnection: close\r\ncontent-length: 0\r\n\r\n" |}]
+;;
+
+let%expect_test "test_custom_error_handler" =
+  let error_handler ?exn:_ status =
+    Async_http.Service.respond_string ~status "Something bad happened"
+  in
+  let stdout = Lazy.force Writer.stdout in
+  let service _request = failwith "ERROR" in
+  let%bind reader, write_to_reader = pipe () in
+  let%bind read_from_writer, writer = pipe () in
+  let reader_pipe = Input_channel.pipe read_from_writer in
+  let finished = Ivar.create () in
+  (Async_http.Server.run_server_loop ~error_handler service reader writer
+  >>> fun () -> Ivar.fill finished ());
+  Output_channel.write write_to_reader test_post_req_with_fixed_body;
+  Output_channel.schedule_flush write_to_reader;
+  let%bind () = Ivar.read finished in
+  let%bind () = Output_channel.close writer in
+  let%bind () =
+    Pipe.iter_without_pushback reader_pipe ~f:(fun chunk ->
+        Writer.writef stdout "%S" chunk)
+  in
+  [%expect
+    {| "HTTP/1.1 500 Internal Server Error \r\ncontent-length: 22\r\n\r\nSomething bad happened" |}]
+;;
