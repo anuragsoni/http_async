@@ -70,7 +70,12 @@ module Reader = struct
          with
         | [] -> `Fixed 0L
         (* TODO: check for exceptions when converting to int *)
-        | [ x ] -> `Fixed (Int64.of_string x)
+        | [ x ] ->
+          let len =
+            try Int64.of_string x with
+            | _ -> -1L
+          in
+          if Int64.(len >= 0L) then `Fixed len else `Bad_request
         | _ -> `Bad_request)
     ;;
 
