@@ -67,7 +67,9 @@ let run_server_loop ?(error_handler = default_error_handler) handle_request read
       >>> fun (res, res_body) ->
       write_response writer (Body.Writer.encoding res_body) res;
       Body.Writer.Private.write res_body writer
-      >>> fun () -> Output_channel.schedule_flush writer
+      >>> fun () ->
+      Output_channel.schedule_flush writer;
+      Ivar.fill finished ()
     | Ok (req, consumed) ->
       Input_channel.consume reader consumed;
       let req_body = Body.Reader.Private.create req reader in
