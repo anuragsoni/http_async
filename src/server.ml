@@ -38,7 +38,7 @@ let write_response writer encoding res =
   (match encoding with
   | `Fixed len ->
     Writer.write writer "content-length: ";
-    Writer.write writer (Int64.to_string len);
+    Writer.write writer (Int.to_string len);
     Writer.write writer "\r\n"
   | `Chunked -> Writer.write writer "transfer-encoding: chunked\r\n");
   Writer.write writer "\r\n"

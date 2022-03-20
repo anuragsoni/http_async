@@ -4,7 +4,7 @@ open Shuttle
 
 type encoding =
   [ `Chunked
-  | `Fixed of int64
+  | `Fixed of int
   ]
 [@@deriving sexp]
 
@@ -15,7 +15,7 @@ module Reader = struct
     }
   [@@deriving sexp_of]
 
-  let empty = { encoding = `Fixed 0L; reader = Pipe.empty () }
+  let empty = { encoding = `Fixed 0; reader = Pipe.empty () }
 
   module Private = struct
     let fixed_reader len chan =
@@ -68,22 +68,22 @@ module Reader = struct
              ~compare:String.Caseless.compare
              (Headers.find_multi headers "Content-Length")
          with
-        | [] -> `Fixed 0L
+        | [] -> `Fixed 0
         (* TODO: check for exceptions when converting to int *)
         | [ x ] ->
           let len =
-            try Int64.of_string x with
-            | _ -> -1L
+            try Int.of_string x with
+            | _ -> -1
           in
-          if Int64.(len >= 0L) then `Fixed len else `Bad_request
+          if Int.(len >= 0) then `Fixed len else `Bad_request
         | _ -> `Bad_request)
     ;;
 
     let create req chan =
       match get_transfer_encoding (Request.headers req) with
-      | `Fixed 0L -> Ok empty
+      | `Fixed 0 -> Ok empty
       | `Fixed len as encoding ->
-        let reader = fixed_reader (Int64.to_int_exn len) chan in
+        let reader = fixed_reader len chan in
         Ok { encoding; reader }
       | `Chunked as encoding -> Ok { encoding; reader = chunked_reader chan }
       | `Bad_request -> Or_error.error_s [%sexp "Invalid transfer encoding"]
@@ -110,11 +110,11 @@ module Writer = struct
   [@@deriving sexp_of]
 
   let encoding t = t.encoding
-  let empty = { encoding = `Fixed 0L; kind = Empty }
-  let string x = { encoding = `Fixed (Int64.of_int (String.length x)); kind = String x }
+  let empty = { encoding = `Fixed 0; kind = Empty }
+  let string x = { encoding = `Fixed (Int.of_int (String.length x)); kind = String x }
 
   let bigstring x =
-    { encoding = `Fixed (Int64.of_int (Bigstring.length x)); kind = Bigstring x }
+    { encoding = `Fixed (Int.of_int (Bigstring.length x)); kind = Bigstring x }
   ;;
 
   let stream ?(encoding = `Chunked) x = { encoding; kind = Stream x }
