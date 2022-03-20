@@ -3,22 +3,27 @@ open! Async
 open! Shuttle
 open Eager_deferred.Use
 
-type request = Http.Request.t * Body.Reader.t
-type response = Http.Response.t * Body.Writer.t
+type request = Request.t * Body.Reader.t
+type response = Response.t * Body.Writer.t
 type handler = request -> response Deferred.t
-type error_handler = ?exn:Exn.t -> Http.Status.t -> response Deferred.t
+type error_handler = ?exn:Exn.t -> Status.t -> response Deferred.t
+
+let keep_alive headers =
+  match Headers.find headers "connection" with
+  | Some x when String.Caseless.equal x "close" -> false
+  | _ -> true
+;;
 
 let write_response writer encoding res =
   let module Writer = Output_channel in
-  let open Http in
   Writer.write writer (Version.to_string (Response.version res));
   Writer.write_char writer ' ';
   Writer.write writer (Status.to_string (Response.status res));
   Writer.write_char writer ' ';
   Writer.write writer "\r\n";
   let headers = Response.headers res in
-  Header.iter
-    (fun key data ->
+  Headers.iter
+    ~f:(fun ~key ~data ->
       (* TODO: Should this raise an exception if the user provides invalid set of headers,
          i.e. multiple content-lengths, invalid transfer-encoding etc? *)
       if not
@@ -31,15 +36,11 @@ let write_response writer encoding res =
         Writer.write writer "\r\n"))
     headers;
   (match encoding with
-  | Http.Transfer.Fixed len ->
+  | `Fixed len ->
     Writer.write writer "content-length: ";
     Writer.write writer (Int64.to_string len);
     Writer.write writer "\r\n"
-  | Http.Transfer.Chunked -> Writer.write writer "transfer-encoding: chunked\r\n"
-  | Http.Transfer.Unknown ->
-    (* TODO: This situation shouldn't happen but maybe we should deal with this
-       somehow? *)
-    ());
+  | `Chunked -> Writer.write writer "transfer-encoding: chunked\r\n");
   Writer.write writer "\r\n"
 ;;
 
@@ -72,18 +73,28 @@ let run_server_loop ?(error_handler = default_error_handler) handle_request read
       Ivar.fill finished ()
     | Ok (req, consumed) ->
       Input_channel.consume reader consumed;
-      let req_body = Body.Reader.Private.create req reader in
-      handle_request (req, req_body)
-      >>> fun (res, res_body) ->
-      let keep_alive =
-        Http.Request.is_keep_alive req && Http.Response.is_keep_alive res
-      in
-      write_response writer (Body.Writer.encoding res_body) res;
-      Body.Writer.Private.write res_body writer
-      >>> fun () ->
-      Body.Reader.drain req_body
-      >>> fun () ->
-      if keep_alive then loop reader writer handle_request else Ivar.fill finished ()
+      (match Body.Reader.Private.create req reader with
+      | Error _error ->
+        Logger.error "Invalid request body";
+        error_handler `Bad_request
+        >>> fun (res, res_body) ->
+        write_response writer (Body.Writer.encoding res_body) res;
+        Body.Writer.Private.write res_body writer
+        >>> fun () ->
+        Output_channel.schedule_flush writer;
+        Ivar.fill finished ()
+      | Ok req_body ->
+        handle_request (req, req_body)
+        >>> fun (res, res_body) ->
+        let keep_alive =
+          keep_alive (Request.headers req) && keep_alive (Response.headers res)
+        in
+        write_response writer (Body.Writer.encoding res_body) res;
+        Body.Writer.Private.write res_body writer
+        >>> fun () ->
+        Body.Reader.drain req_body
+        >>> fun () ->
+        if keep_alive then loop reader writer handle_request else Ivar.fill finished ())
   in
   (Monitor.detach_and_get_next_error monitor
   >>> fun exn ->

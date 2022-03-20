@@ -1,5 +1,4 @@
 open Core
-open Http
 
 let[@inline always] is_tchar = function
   | '0' .. '9'
@@ -203,7 +202,9 @@ let token source =
 
 let meth source =
   let token = token source in
-  Method.of_string token
+  match Meth.of_string token with
+  | Some m -> m
+  | None -> raise_notrace (Msg "Invalid HTTP Method")
 ;;
 
 let version_source source =
@@ -214,8 +215,7 @@ let version_source source =
 let version source =
   let ch = version_source source in
   match ch with
-  | '1' -> `HTTP_1_1
-  | '0' -> `HTTP_1_0
+  | '1' -> Version.Http_1_1
   | _ -> raise_notrace (Msg "Invalid http version")
 ;;
 
@@ -247,7 +247,7 @@ let headers =
     if (not (Source.is_empty source)) && Char.(Source.get_unsafe source 0 = '\r')
     then (
       eol source;
-      Header.of_list (List.rev acc))
+      Headers.of_rev_list (List.rev acc))
     else (
       let v = header source in
       eol source;
@@ -331,18 +331,12 @@ let version source =
   version
 ;;
 
-let[@warning "-3"] request source =
+let request source =
   let meth = meth source in
   let path = token source in
   let version = version source in
   let headers = headers source in
-  { Request.headers
-  ; meth
-  ; scheme = None
-  ; resource = path
-  ; version
-  ; encoding = Transfer.Unknown
-  }
+  Request.create ~version ~headers meth path
 ;;
 
 let take len source =

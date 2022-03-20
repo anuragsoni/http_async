@@ -1,4 +1,5 @@
 open! Core
+open Async_http
 
 let req =
   "GET /wp-content/uploads/2010/03/hello-kitty-darth-vader-pink.jpg HTTP/1.1\r\n\
@@ -19,22 +20,6 @@ let req =
 
 let req = Bigstring.of_string req
 
-let[@warning "-3"] make_req ~headers ?(encoding = Http.Transfer.Fixed 0L) meth resource =
-  { Http.Request.headers; meth; resource; scheme = None; encoding; version = `HTTP_1_1 }
-;;
-
-let sexp_of_request { Http.Request.headers; meth; resource; scheme; version; _ } =
-  [%sexp
-    { meth = (Http.Method.to_string meth : string)
-    ; resource : string
-    ; scheme : string option
-    ; version = (Http.Version.to_string version : string)
-    ; headers = (Http.Header.to_list headers : (string * string) list)
-    }]
-;;
-
-type request = Http.Request.t
-
 module P = Async_http.Private.Parser
 
 type 'a success =
@@ -51,15 +36,16 @@ let parse_or_error res =
 ;;
 
 let%expect_test "can parse single request" =
-  print_s ([%sexp_of: request success Or_error.t] (parse_or_error (P.parse_request req)));
+  print_s
+    ([%sexp_of: Request.t success Or_error.t] (parse_or_error (P.parse_request req)));
   [%expect
     {|
     (Ok
      ((consumed 706)
       (value
        ((meth GET)
-        (resource /wp-content/uploads/2010/03/hello-kitty-darth-vader-pink.jpg)
-        (scheme ()) (version HTTP/1.1)
+        (path /wp-content/uploads/2010/03/hello-kitty-darth-vader-pink.jpg)
+        (version Http_1_1)
         (headers
          ((Host www.kittyhell.com)
           (User-Agent
@@ -79,7 +65,8 @@ let%expect_test "reject headers with space before colon" =
     Bigstring.of_string
       "GET / HTTP/1.1\r\nHost : www.kittyhell.com\r\nKeep-Alive: 115\r\n\r\n"
   in
-  print_s ([%sexp_of: request success Or_error.t] (parse_or_error (P.parse_request req)));
+  print_s
+    ([%sexp_of: Request.t success Or_error.t] (parse_or_error (P.parse_request req)));
   [%expect {| (Error "Parse error (Invalid Header Key)") |}]
 ;;
 
@@ -108,15 +95,14 @@ let more_requests =
 
 let%expect_test "can parse request at offset" =
   print_s
-    ([%sexp_of: request success Or_error.t]
+    ([%sexp_of: Request.t success Or_error.t]
        (parse_or_error (P.parse_request ~pos:304 more_requests)));
   [%expect
     {|
     (Ok
      ((consumed 315)
       (value
-       ((meth GET) (resource /reddit.v_EZwRzV-Ns.css) (scheme ())
-        (version HTTP/1.1)
+       ((meth GET) (path /reddit.v_EZwRzV-Ns.css) (version Http_1_1)
         (headers
          ((Host www.redditstatic.com)
           (User-Agent
@@ -128,7 +114,7 @@ let%expect_test "can parse request at offset" =
 
 let%expect_test "can report a partial parse" =
   print_s
-    ([%sexp_of: request success Or_error.t]
+    ([%sexp_of: Request.t success Or_error.t]
        (parse_or_error (P.parse_request ~len:50 req)));
   [%expect {| (Error Partial) |}]
 ;;
@@ -138,7 +124,8 @@ let%expect_test "can validate http version" =
     Bigstring.of_string
       "GET / HTTP/1.4\r\nHost: www.kittyhell.com\r\nKeep-Alive: 115\r\n\r\n"
   in
-  print_s ([%sexp_of: request success Or_error.t] (parse_or_error (P.parse_request req)));
+  print_s
+    ([%sexp_of: Request.t success Or_error.t] (parse_or_error (P.parse_request req)));
   [%expect {| (Error "Parse error (Invalid http version)") |}]
 ;;
 
