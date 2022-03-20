@@ -2,6 +2,10 @@ open! Core
 open! Async
 open! Shuttle
 module Logger : Log.Global_intf
+module Status = Status
+module Request = Request
+module Response = Response
+module Meth = Meth
 
 (** [Service] is the core abstraction that represents an HTTP server within async_http.*)
 module Service : sig
@@ -15,19 +19,7 @@ module Service : sig
   val resource : request -> string
 
   (** [meth] returns the HTTP verb for a given request. *)
-  val meth
-    :  request
-    -> [ `GET
-       | `POST
-       | `HEAD
-       | `DELETE
-       | `PATCH
-       | `PUT
-       | `OPTIONS
-       | `TRACE
-       | `CONNECT
-       | `Other of string
-       ]
+  val meth : request -> Meth.t
 
   (** [body] returns the HTTP request body for a given request. *)
   val body : request -> string Pipe.Reader.t
@@ -45,7 +37,7 @@ module Service : sig
       added with the value set to the string's length. *)
   val respond_string
     :  ?headers:(string * string) list
-    -> ?status:Http.Status.t
+    -> ?status:Status.t
     -> string
     -> response Deferred.t
 
@@ -54,7 +46,7 @@ module Service : sig
       header, one is added with the value set to the bigstring's length. *)
   val respond_bigstring
     :  ?headers:(string * string) list
-    -> ?status:Http.Status.t
+    -> ?status:Status.t
     -> Bigstring.t
     -> response Deferred.t
 
@@ -62,13 +54,13 @@ module Service : sig
       its sent over the wire. *)
   val respond_stream
     :  ?headers:(string * string) list
-    -> ?status:Http.Status.t
+    -> ?status:Status.t
     -> string Pipe.Reader.t
     -> response Deferred.t
 end
 
 module Server : sig
-  type error_handler = ?exn:Exn.t -> Http.Status.t -> Service.response Deferred.t
+  type error_handler = ?exn:Exn.t -> Status.t -> Service.response Deferred.t
 
   (** [run_server_loop] accepts a HTTP service, and returns a callback that can be used to
       drive the server loop created via [Shuttle.Connection.listen]. This allows the user

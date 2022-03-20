@@ -8,7 +8,6 @@ This library isn't published to the opam repository yet so it requires pinning t
 
 ```
 opam pin add -n shuttle.dev git+https://github.com/anuragsoni/shuttle.git
-opam pin add -n http.dev git+https://github.com/mirage/ocaml-cohttp.git
 opam pin add -n async_http.dev git+https://github.com/anuragsoni/async_http.git
 opam install async_http
 ```

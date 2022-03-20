@@ -40,16 +40,15 @@ let%expect_test "test simple server" =
     [%expect
       {|
     Hello
-    (((meth POST) (headers ((Host www.example.com) (Content-Length 5)))
-      (version HTTP/1.1) (resource /hello))
+    (((meth POST) (path /hello) (version Http_1_1)
+      (headers ((Host www.example.com) (Content-Length 5))))
      ((encoding (Fixed 5)) (reader <opaque>))) |}]
   in
   let%bind () = Output_channel.close writer in
   let%bind () =
     Pipe.iter_without_pushback reader_pipe ~f:(fun v -> Writer.writef stdout "%S" v)
   in
-  [%expect
-    {| "HTTP/1.1 200 OK \r\nconnection: close\r\ncontent-length: 5\r\n\r\nWorld" |}]
+  [%expect {| "HTTP/1.1 200 \r\nconnection: close\r\ncontent-length: 5\r\n\r\nWorld" |}]
 ;;
 
 let%expect_test "test_default_error_handler" =
@@ -69,8 +68,7 @@ let%expect_test "test_default_error_handler" =
     Pipe.iter_without_pushback reader_pipe ~f:(fun chunk ->
         Writer.writef stdout "%S" chunk)
   in
-  [%expect
-    {| "HTTP/1.1 500 Internal Server Error \r\nconnection: close\r\ncontent-length: 0\r\n\r\n" |}]
+  [%expect {| "HTTP/1.1 500 \r\nconnection: close\r\ncontent-length: 0\r\n\r\n" |}]
 ;;
 
 let%expect_test "test_custom_error_handler" =
@@ -93,6 +91,5 @@ let%expect_test "test_custom_error_handler" =
     Pipe.iter_without_pushback reader_pipe ~f:(fun chunk ->
         Writer.writef stdout "%S" chunk)
   in
-  [%expect
-    {| "HTTP/1.1 500 Internal Server Error \r\ncontent-length: 22\r\n\r\nSomething bad happened" |}]
+  [%expect {| "HTTP/1.1 500 \r\ncontent-length: 22\r\n\r\nSomething bad happened" |}]
 ;;

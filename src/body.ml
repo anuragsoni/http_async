@@ -2,10 +2,10 @@ open Core
 open Async
 open Shuttle
 
-type encoding = Http.Transfer.encoding =
-  | Chunked
-  | Fixed of int64
-  | Unknown
+type encoding =
+  [ `Chunked
+  | `Fixed of int
+  ]
 [@@deriving sexp]
 
 module Reader = struct
@@ -15,7 +15,7 @@ module Reader = struct
     }
   [@@deriving sexp_of]
 
-  let empty = { encoding = Http.Transfer.Fixed 0L; reader = Pipe.empty () }
+  let empty = { encoding = `Fixed 0; reader = Pipe.empty () }
 
   module Private = struct
     let fixed_reader len chan =
@@ -58,14 +58,35 @@ module Reader = struct
                   >>| fun () -> `Repeat (Parser.Continue_chunk to_consume))))
     ;;
 
+    let get_transfer_encoding headers =
+      match List.rev @@ Headers.find_multi headers "Transfer-Encoding" with
+      | x :: _ when String.Caseless.equal x "chunked" -> `Chunked
+      | _x :: _ -> `Bad_request
+      | [] ->
+        (match
+           List.dedup_and_sort
+             ~compare:String.Caseless.compare
+             (Headers.find_multi headers "Content-Length")
+         with
+        | [] -> `Fixed 0
+        (* TODO: check for exceptions when converting to int *)
+        | [ x ] ->
+          let len =
+            try Int.of_string x with
+            | _ -> -1
+          in
+          if Int.(len >= 0) then `Fixed len else `Bad_request
+        | _ -> `Bad_request)
+    ;;
+
     let create req chan =
-      match Http.Header.get_transfer_encoding (Http.Request.headers req) with
-      | Http.Transfer.Unknown -> empty
-      | Http.Transfer.Fixed 0L -> empty
-      | Http.Transfer.Fixed len as encoding ->
-        let reader = fixed_reader (Int64.to_int_exn len) chan in
-        { encoding; reader }
-      | Http.Transfer.Chunked as encoding -> { encoding; reader = chunked_reader chan }
+      match get_transfer_encoding (Request.headers req) with
+      | `Fixed 0 -> Ok empty
+      | `Fixed len as encoding ->
+        let reader = fixed_reader len chan in
+        Ok { encoding; reader }
+      | `Chunked as encoding -> Ok { encoding; reader = chunked_reader chan }
+      | `Bad_request -> Or_error.error_s [%sexp "Invalid transfer encoding"]
     ;;
   end
 
@@ -89,30 +110,25 @@ module Writer = struct
   [@@deriving sexp_of]
 
   let encoding t = t.encoding
-  let empty = { encoding = Http.Transfer.Fixed 0L; kind = Empty }
-
-  let string x =
-    { encoding = Http.Transfer.Fixed (Int64.of_int (String.length x)); kind = String x }
-  ;;
+  let empty = { encoding = `Fixed 0; kind = Empty }
+  let string x = { encoding = `Fixed (Int.of_int (String.length x)); kind = String x }
 
   let bigstring x =
-    { encoding = Http.Transfer.Fixed (Int64.of_int (Bigstring.length x))
-    ; kind = Bigstring x
-    }
+    { encoding = `Fixed (Int.of_int (Bigstring.length x)); kind = Bigstring x }
   ;;
 
-  let stream ?(encoding = Http.Transfer.Chunked) x = { encoding; kind = Stream x }
+  let stream ?(encoding = `Chunked) x = { encoding; kind = Stream x }
 
   module Private = struct
     let is_chunked t =
       match t.encoding with
-      | Http.Transfer.Chunked -> true
+      | `Chunked -> true
       | _ -> false
     ;;
 
     let make_writer t =
       match t.encoding with
-      | Http.Transfer.Chunked ->
+      | `Chunked ->
         fun writer buf ->
           (* avoid writing empty payloads as that is used to indicate the end of a
              stream. *)
@@ -123,7 +139,7 @@ module Writer = struct
             Output_channel.write writer buf;
             Output_channel.write writer "\r\n";
             Output_channel.flush writer)
-      | _ ->
+      | `Fixed _ ->
         fun writer buf ->
           if String.is_empty buf
           then Deferred.unit
