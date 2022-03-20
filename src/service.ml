@@ -7,6 +7,7 @@ type t = request -> response Deferred.t
 
 let body request = Body.Reader.pipe (snd request)
 let header request key = Headers.find (Request.headers (fst request)) key
+let header_multi request key = Headers.find_multi (Request.headers (fst request)) key
 let resource request = Request.path (fst request)
 let meth request = Request.meth (fst request)
 

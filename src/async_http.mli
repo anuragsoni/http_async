@@ -28,6 +28,10 @@ module Service : sig
       exists. *)
   val header : request -> string -> string option
 
+  (** [header_multi request key] returns a list of all header values associated with
+      [key]. *)
+  val header_multi : request -> string -> string list
+
   (** [respond_string] creates a new fixed length encoded response from the user provided
       string. If the user provided headers don't contain a Content-Length header, one is
       added with the value set to the string's length. *)
