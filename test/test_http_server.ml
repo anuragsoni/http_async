@@ -93,3 +93,40 @@ let%expect_test "test_custom_error_handler" =
   in
   [%expect {| "HTTP/1.1 500 \r\ncontent-length: 22\r\n\r\nSomething bad happened" |}]
 ;;
+
+let test_post_req_with_chunked_body =
+  "POST /hello HTTP/1.1\r\n\
+   Host: www.example.com\r\n\
+   Transfer-Encoding: chunked\r\n\
+   \r\n\
+   5\r\n\
+   Hello\r\n\
+   0\r\n\
+   \r\n"
+;;
+
+let%expect_test "streaming bodies" =
+  let stdout = Lazy.force Writer.stdout in
+  let service request =
+    let open Async_http in
+    let body = Service.body request in
+    Service.respond_stream body
+  in
+  let%bind reader, write_to_reader = pipe () in
+  let%bind read_from_writer, writer = pipe () in
+  let reader_pipe = Input_channel.pipe read_from_writer in
+  let finished = Ivar.create () in
+  (Async_http.Server.run_server_loop service reader writer
+  >>> fun () -> Ivar.fill finished ());
+  Output_channel.write write_to_reader test_post_req_with_chunked_body;
+  Output_channel.schedule_flush write_to_reader;
+  let%bind () = Output_channel.close write_to_reader in
+  let%bind () = Ivar.read finished in
+  let%bind () = Output_channel.close writer in
+  let%bind () =
+    Pipe.iter_without_pushback reader_pipe ~f:(fun chunk ->
+        Writer.writef stdout "%S" chunk)
+  in
+  [%expect
+    {| "HTTP/1.1 200 \r\ntransfer-encoding: chunked\r\n\r\n5\r\nHello\r\n0\r\n\r\n" |}]
+;;
