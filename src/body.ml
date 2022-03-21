@@ -2,15 +2,9 @@ open Core
 open Async
 open Shuttle
 
-type encoding =
-  [ `Chunked
-  | `Fixed of int
-  ]
-[@@deriving sexp]
-
 module Reader = struct
   type t =
-    { encoding : encoding
+    { encoding : [ `Chunked | `Fixed of int ]
     ; reader : (string Pipe.Reader.t[@sexp.opaque])
     }
   [@@deriving sexp_of]
@@ -104,7 +98,7 @@ module Writer = struct
   [@@deriving sexp_of]
 
   type t =
-    { encoding : encoding
+    { encoding : [ `Chunked | `Fixed of int ]
     ; kind : kind
     }
   [@@deriving sexp_of]

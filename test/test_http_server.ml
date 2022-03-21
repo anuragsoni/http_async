@@ -1,6 +1,9 @@
 open! Core
 open! Async
 open! Shuttle
+open Async_http
+
+let default_service _ = Service.respond_string "Hello World"
 
 let pipe () =
   Unix.pipe (Info.of_string "test shuttle http")
@@ -129,4 +132,29 @@ let%expect_test "streaming bodies" =
   in
   [%expect
     {| "HTTP/1.1 200 \r\ntransfer-encoding: chunked\r\n\r\n5\r\nHello\r\n0\r\n\r\n" |}]
+;;
+
+let%expect_test "bad transfer encoding header" =
+  let stdout = Lazy.force Writer.stdout in
+  let%bind reader, write_to_reader = pipe () in
+  let%bind read_from_writer, writer = pipe () in
+  let reader_pipe = Input_channel.pipe read_from_writer in
+  let finished = Ivar.create () in
+  (Async_http.Server.run_server_loop default_service reader writer
+  >>> fun () -> Ivar.fill finished ());
+  Output_channel.write
+    write_to_reader
+    "POST /hello HTTP/1.1\r\n\
+     Host: www.example.com   \r\n\
+     Transfer-Encoding: foobar\r\n\
+     \r\n\
+     Hello\r\n";
+  Output_channel.schedule_flush write_to_reader;
+  let%bind () = Ivar.read finished in
+  let%bind () = Output_channel.close writer in
+  let%bind () =
+    Pipe.iter_without_pushback reader_pipe ~f:(fun chunk ->
+        Writer.writef stdout "%S" chunk)
+  in
+  [%expect {| "HTTP/1.1 400 \r\nconnection: close\r\ncontent-length: 0\r\n\r\n" |}]
 ;;

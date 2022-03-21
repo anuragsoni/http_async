@@ -63,7 +63,7 @@ let run_server_loop ?(error_handler = default_error_handler) handle_request read
       | `Ok -> loop reader writer handle_request
       | `Eof | `Buffer_is_full -> Ivar.fill finished ())
     | Error (Msg msg) ->
-      Logger.error "Error while parsing HTTP request: %s" msg;
+      Logger.debug "Error while parsing HTTP request: %s" msg;
       error_handler `Bad_request
       >>> fun (res, res_body) ->
       write_response writer (Body.Writer.encoding res_body) res;
@@ -75,7 +75,7 @@ let run_server_loop ?(error_handler = default_error_handler) handle_request read
       Input_channel.consume reader consumed;
       (match Body.Reader.Private.create req reader with
       | Error _error ->
-        Logger.error "Invalid request body";
+        Logger.debug "Invalid request body";
         error_handler `Bad_request
         >>> fun (res, res_body) ->
         write_response writer (Body.Writer.encoding res_body) res;
