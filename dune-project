@@ -22,6 +22,7 @@
   (ocaml
    (>= 4.08.0))
   shuttle
+  ppxlib
   (ppx_jane
    (and
     (>= v0.14)

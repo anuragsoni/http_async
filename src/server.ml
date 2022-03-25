@@ -9,7 +9,7 @@ type handler = request -> response Deferred.t
 type error_handler = ?exn:Exn.t -> Status.t -> response Deferred.t
 
 let keep_alive headers =
-  match Headers.find headers "connection" with
+  match Headers.(find headers connection) with
   | Some x when String.Caseless.equal x "close" -> false
   | _ -> true
 ;;
@@ -25,9 +25,12 @@ let write_response writer encoding res =
   let headers =
     match encoding with
     | `Fixed len ->
-      Headers.add_unless_exists headers ~key:"content-length" ~data:(Int.to_string len)
+      Headers.add_unless_exists
+        headers
+        ~key:Headers.content_length
+        ~data:(Int.to_string len)
     | `Chunked ->
-      Headers.add_unless_exists headers ~key:"transfer-encoding" ~data:"chunked"
+      Headers.add_unless_exists headers ~key:Headers.transfer_encoding ~data:"chunked"
   in
   Headers.iter
     ~f:(fun ~key ~data ->
@@ -41,7 +44,7 @@ let write_response writer encoding res =
 
 let default_error_handler ?exn:_ status =
   Service.respond_string
-    ~headers:[ "connection", "close"; "content-length", "0" ]
+    ~headers:[ Headers.connection, "close"; Headers.content_length, "0" ]
     ~status
     ""
 ;;

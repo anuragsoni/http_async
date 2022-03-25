@@ -6,6 +6,7 @@ module Status = Status
 module Request = Request
 module Response = Response
 module Meth = Meth
+module Headers = Headers
 
 (** [Service] is the core abstraction that represents an HTTP server within async_http.*)
 module Service : sig
