@@ -51,7 +51,7 @@ let%expect_test "test simple server" =
   let%bind () =
     Pipe.iter_without_pushback reader_pipe ~f:(fun v -> Writer.writef stdout "%S" v)
   in
-  [%expect {| "HTTP/1.1 200 \r\nconnection: close\r\ncontent-length: 5\r\n\r\nWorld" |}]
+  [%expect {| "HTTP/1.1 200 \r\ncontent-length: 5\r\nconnection: close\r\n\r\nWorld" |}]
 ;;
 
 let%expect_test "test_default_error_handler" =

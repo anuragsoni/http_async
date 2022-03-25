@@ -18,3 +18,4 @@ let find_multi t key =
 ;;
 
 let empty = []
+let add_unless_exists t ~key ~data = if not (mem t key) then (key, data) :: t else t

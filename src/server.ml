@@ -22,25 +22,20 @@ let write_response writer encoding res =
   Writer.write_char writer ' ';
   Writer.write writer "\r\n";
   let headers = Response.headers res in
+  let headers =
+    match encoding with
+    | `Fixed len ->
+      Headers.add_unless_exists headers ~key:"content-length" ~data:(Int.to_string len)
+    | `Chunked ->
+      Headers.add_unless_exists headers ~key:"transfer-encoding" ~data:"chunked"
+  in
   Headers.iter
     ~f:(fun ~key ~data ->
-      (* TODO: Should this raise an exception if the user provides invalid set of headers,
-         i.e. multiple content-lengths, invalid transfer-encoding etc? *)
-      if not
-           (String.Caseless.equal key "content-length"
-           || String.Caseless.equal key "transfer-encoding")
-      then (
-        Writer.write writer key;
-        Writer.write writer ": ";
-        Writer.write writer data;
-        Writer.write writer "\r\n"))
+      Writer.write writer key;
+      Writer.write writer ": ";
+      Writer.write writer data;
+      Writer.write writer "\r\n")
     headers;
-  (match encoding with
-  | `Fixed len ->
-    Writer.write writer "content-length: ";
-    Writer.write writer (Int.to_string len);
-    Writer.write writer "\r\n"
-  | `Chunked -> Writer.write writer "transfer-encoding: chunked\r\n");
   Writer.write writer "\r\n"
 ;;
 
