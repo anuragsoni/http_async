@@ -9,7 +9,7 @@ type handler = request -> response Deferred.t
 type error_handler = ?exn:Exn.t -> Status.t -> response Deferred.t
 
 let keep_alive headers =
-  match Headers.find headers "connection" with
+  match Headers.(find headers connection) with
   | Some x when String.Caseless.equal x "close" -> false
   | _ -> true
 ;;

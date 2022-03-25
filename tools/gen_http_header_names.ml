@@ -5,15 +5,13 @@ module Builder = Ast_builder.Default
 module Csv_line = struct
   type t = { name : string }
 
-  let spec =
-    let open Delimited_kernel.Read.Let_syntax in
-    let%map_open name = at_header "Field Name" ~f:Fn.id in
-    { name }
-  ;;
-
   let lines_from_file name =
     In_channel.with_file name ~f:(fun chan ->
-        Delimited_kernel.Read.read_lines ~header:`Yes spec chan)
+        let (_ : string) = In_channel.input_line_exn chan in
+        In_channel.fold_lines chan ~init:[] ~f:(fun acc line ->
+            match String.split line ~on:',' with
+            | name :: _ -> { name } :: acc
+            | _ -> invalid_arg "Invaline line"))
   ;;
 end
 
