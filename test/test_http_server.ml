@@ -71,7 +71,7 @@ let%expect_test "test_default_error_handler" =
     Pipe.iter_without_pushback reader_pipe ~f:(fun chunk ->
         Writer.writef stdout "%S" chunk)
   in
-  [%expect {| "HTTP/1.1 500 \r\nconnection: close\r\ncontent-length: 0\r\n\r\n" |}]
+  [%expect {| "HTTP/1.1 500 \r\nConnection: close\r\nContent-Length: 0\r\n\r\n" |}]
 ;;
 
 let%expect_test "test_custom_error_handler" =
@@ -94,7 +94,7 @@ let%expect_test "test_custom_error_handler" =
     Pipe.iter_without_pushback reader_pipe ~f:(fun chunk ->
         Writer.writef stdout "%S" chunk)
   in
-  [%expect {| "HTTP/1.1 500 \r\ncontent-length: 22\r\n\r\nSomething bad happened" |}]
+  [%expect {| "HTTP/1.1 500 \r\nContent-Length: 22\r\n\r\nSomething bad happened" |}]
 ;;
 
 let test_post_req_with_chunked_body =
@@ -131,7 +131,7 @@ let%expect_test "streaming bodies" =
         Writer.writef stdout "%S" chunk)
   in
   [%expect
-    {| "HTTP/1.1 200 \r\ntransfer-encoding: chunked\r\n\r\n5\r\nHello\r\n0\r\n\r\n" |}]
+    {| "HTTP/1.1 200 \r\nTransfer-Encoding: chunked\r\n\r\n5\r\nHello\r\n0\r\n\r\n" |}]
 ;;
 
 let%expect_test "bad transfer encoding header" =
@@ -156,5 +156,5 @@ let%expect_test "bad transfer encoding header" =
     Pipe.iter_without_pushback reader_pipe ~f:(fun chunk ->
         Writer.writef stdout "%S" chunk)
   in
-  [%expect {| "HTTP/1.1 400 \r\nconnection: close\r\ncontent-length: 0\r\n\r\n" |}]
+  [%expect {| "HTTP/1.1 400 \r\nConnection: close\r\nContent-Length: 0\r\n\r\n" |}]
 ;;

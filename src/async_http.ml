@@ -6,6 +6,7 @@ module Status = Status
 module Meth = Meth
 module Request = Request
 module Response = Response
+module Headers = Headers
 
 module Private = struct
   module Parser = Parser

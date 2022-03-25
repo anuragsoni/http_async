@@ -1,5 +1,7 @@
 open Core
 
+include Common_header_names
+
 type t = (string, string) List.Assoc.t [@@deriving sexp]
 
 let of_rev_list xs = xs
