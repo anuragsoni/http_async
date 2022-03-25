@@ -2,7 +2,7 @@ open! Core
 
 type error =
   | Partial
-  | Msg of string
+  | Fail of Error.t
 
 type chunk_kind =
   | Start_chunk

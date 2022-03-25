@@ -32,9 +32,7 @@ module Reader = struct
           Deferred.repeat_until_finished Parser.Start_chunk (fun state ->
               let view = Input_channel.view chan in
               match Parser.parse_chunk ~pos:view.pos ~len:view.len view.buf state with
-              | Error (Msg msg) ->
-                Logger.error "Error while parsing chunk: %s" msg;
-                failwith msg
+              | Error (Fail error) -> Error.raise error
               | Error Partial ->
                 Input_channel.refill chan
                 >>| (function

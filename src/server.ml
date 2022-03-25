@@ -62,8 +62,8 @@ let run_server_loop ?(error_handler = default_error_handler) handle_request read
       >>> (function
       | `Ok -> loop reader writer handle_request
       | `Eof | `Buffer_is_full -> Ivar.fill finished ())
-    | Error (Msg msg) ->
-      Logger.debug "Error while parsing HTTP request: %s" msg;
+    | Error (Fail error) ->
+      Logger.debug "Error while parsing HTTP request: %s" (Error.to_string_mach error);
       error_handler `Bad_request
       >>> fun (res, res_body) ->
       write_response writer (Body.Writer.encoding res_body) res;

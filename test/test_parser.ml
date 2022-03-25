@@ -32,7 +32,7 @@ let parse_or_error res =
   match res with
   | Ok (value, consumed) -> Ok { value; consumed }
   | Error P.Partial -> Or_error.errorf "Partial"
-  | Error (Msg msg) -> Or_error.errorf "Parse error (%s)" msg
+  | Error (Fail error) -> Error (Error.tag error ~tag:"Parse error")
 ;;
 
 let%expect_test "can parse single request" =
@@ -67,7 +67,7 @@ let%expect_test "reject headers with space before colon" =
   in
   print_s
     ([%sexp_of: Request.t success Or_error.t] (parse_or_error (P.parse_request req)));
-  [%expect {| (Error "Parse error (Invalid Header Key)") |}]
+  [%expect {| (Error ("Parse error" "Invalid Header Key")) |}]
 ;;
 
 let more_requests =
@@ -126,7 +126,7 @@ let%expect_test "can validate http version" =
   in
   print_s
     ([%sexp_of: Request.t success Or_error.t] (parse_or_error (P.parse_request req)));
-  [%expect {| (Error "Parse error (Invalid http version)") |}]
+  [%expect {| (Error ("Parse error" ("Invalid http version" 4))) |}]
 ;;
 
 let%expect_test "parse result indicates location of start of body" =
@@ -162,7 +162,7 @@ let parse_chunk_length () =
       match P.parse_chunk_length payload with
       | Ok res ->
         [%test_eq: int * int] res (num, String.length (Printf.sprintf "%x" num) + 2)
-      | Error (P.Msg _) -> ()
+      | Error (P.Fail _) -> ()
       | Error _ -> assert false)
 ;;
 
@@ -172,7 +172,7 @@ let chunk_length_parse_case_insensitive () =
     match P.parse_chunk_length buf with
     | Ok res ->
       [%test_eq: int * int] res (num, String.length (Printf.sprintf "%x" num) + 2)
-    | Error (P.Msg _) -> ()
+    | Error (P.Fail _) -> ()
     | Error _ -> assert false
   in
   Test.run_exn
@@ -210,11 +210,11 @@ let%expect_test "can parse chunk lengths" =
     input: "4511ab\r\n", parse_result: (Ok ((consumed 8) (value 4526507)))
     input: "4511ab  ; a\r\n", parse_result: (Ok ((consumed 13) (value 4526507)))
     input: "4511ab; now in extension\r\n", parse_result: (Ok ((consumed 26) (value 4526507)))
-    input: "4511ab a ; now in extension\r\n", parse_result: (Error "Parse error (Invalid chunk_length character 'a')")
+    input: "4511ab a ; now in extension\r\n", parse_result: (Error ("Parse error" ("Invalid chunk_length character" a)))
     input: "111111111111111\r\n", parse_result: (Ok ((consumed 17) (value 76861433640456465)))
-    input: "1111111111111111\r\n", parse_result: (Error "Parse error (Chunk size is too large)")
-    input: "abc\r12", parse_result: (Error "Parse error (Expected_newline)")
-    input: "abc\n12", parse_result: (Error "Parse error (Invalid chunk_length character '\\n')")
+    input: "1111111111111111\r\n", parse_result: (Error ("Parse error" "Chunk size is too large"))
+    input: "abc\r12", parse_result: (Error ("Parse error" Expected_newline))
+    input: "abc\n12", parse_result: (Error ("Parse error" ("Invalid chunk_length character" "\n")))
     input: "121", parse_result: (Error Partial)
     input: "121\r", parse_result: (Error Partial) |}]
 ;;

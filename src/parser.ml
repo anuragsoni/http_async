@@ -164,7 +164,7 @@ module Source = struct
   ;;
 end
 
-exception Msg of string
+exception Fail of Error.t
 exception Partial
 
 let string str source =
@@ -173,7 +173,7 @@ let string str source =
   then raise_notrace Partial
   else if Source.unsafe_memcmp source 0 str
   then Source.advance source len
-  else raise_notrace (Msg (Printf.sprintf "Could not match: %S" str))
+  else raise_notrace (Fail (Error.create "Could not match string" str sexp_of_string))
 ;;
 
 let any_char source =
@@ -204,7 +204,7 @@ let meth source =
   let token = token source in
   match Meth.of_string token with
   | Some m -> m
-  | None -> raise_notrace (Msg "Invalid HTTP Method")
+  | None -> raise_notrace (Fail (Error.create "Invalid HTTP Method" token sexp_of_string))
 ;;
 
 let version_source source =
@@ -216,7 +216,7 @@ let version source =
   let ch = version_source source in
   match ch with
   | '1' -> Version.Http_1_1
-  | _ -> raise_notrace (Msg "Invalid http version")
+  | _ -> raise_notrace (Fail (Error.create "Invalid http version" ch sexp_of_char))
 ;;
 
 let header source =
@@ -224,7 +224,7 @@ let header source =
   if pos = -1
   then raise_notrace Partial
   else if pos = 0
-  then raise_notrace (Msg "Invalid header: Empty header key")
+  then raise_notrace (Fail (Error.of_string "Invalid header: Empty header key"))
   else if Source.for_all_is_tchar source ~pos:0 ~len:pos
   then (
     let key = Source.to_string source ~pos:0 ~len:pos in
@@ -239,7 +239,7 @@ let header source =
       let v = Source.to_string_trim source ~pos:0 ~len:pos in
       Source.advance_unsafe source pos;
       key, v))
-  else raise_notrace (Msg "Invalid Header Key")
+  else raise_notrace (Fail (Error.of_string "Invalid Header Key"))
 ;;
 
 let headers =
@@ -319,10 +319,10 @@ let chunk_length source =
   match !state with
   | `Ok -> !length
   | `Partial -> raise_notrace Partial
-  | `Expected_newline -> raise_notrace (Msg "Expected_newline")
-  | `Chunk_too_big -> raise_notrace (Msg "Chunk size is too large")
+  | `Expected_newline -> raise_notrace (Fail (Error.of_string "Expected_newline"))
+  | `Chunk_too_big -> raise_notrace (Fail (Error.of_string "Chunk size is too large"))
   | `Invalid_char ch ->
-    raise_notrace (Msg (Printf.sprintf "Invalid chunk_length character %C" ch))
+    raise_notrace (Fail (Error.create "Invalid chunk_length character" ch sexp_of_char))
 ;;
 
 let version source =
@@ -385,14 +385,14 @@ let chunk chunk_kind source =
 
 type error =
   | Partial
-  | Msg of string
+  | Fail of Error.t
 
 let run_parser ?pos ?len buf p =
   let pos = Option.value pos ~default:0 in
   let source = Source.of_bytes ~pos ?len buf in
   match p source with
   | exception Partial -> Error Partial
-  | exception Msg m -> Error (Msg m)
+  | exception Fail m -> Error (Fail m)
   | v ->
     let consumed = source.pos - pos in
     Ok (v, consumed)
