@@ -187,9 +187,6 @@ let any_char source =
 
 let eol = string "\r\n"
 
-(* token = 1*tchar tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "." / "^"
-   / "_" / "`" / "|" / "~" / DIGIT / ALPHA ; any VCHAR, except delimiters *)
-
 let token source =
   let pos = Source.index source ' ' in
   if pos = -1
