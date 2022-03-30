@@ -54,4 +54,7 @@ let command =
         Tcp.Server.close_finished_and_handlers_determined server)
 ;;
 
-let () = Command_unix.run command
+let () =
+  Memtrace.trace_if_requested ();
+  Command_unix.run command
+;;
