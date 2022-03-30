@@ -6,6 +6,7 @@
 
 (rule
  (targets common_header_names.ml)
+ (deps "../tools/header_field_names_iana.csv")
  (action
   (with-stdout-to
    %{targets}
