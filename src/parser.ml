@@ -32,29 +32,6 @@ module Source = struct
     ; upper_bound : int
     }
 
-  let of_bytes ~pos ?len buffer =
-    let buf_len = Bigstring.length buffer in
-    if pos < 0 || pos > buf_len
-    then
-      invalid_arg
-        (Printf.sprintf
-           "Http_parser.Source.of_bigstring: Invalid offset %d. Buffer length: %d"
-           pos
-           buf_len);
-    let len = Option.value len ~default:(buf_len - pos) in
-    if len < 0 || pos + len > buf_len
-    then
-      invalid_arg
-        (Printf.sprintf
-           "Http_parser.Source.of_bigstring: Invalid len %d. offset: %d, buffer_length: \
-            %d, requested_length: %d"
-           len
-           pos
-           buf_len
-           (pos + len));
-    { buffer; pos; upper_bound = pos + len }
-  ;;
-
   let[@inline always] get_unsafe t idx = Bigstring.get t.buffer (t.pos + idx)
 
   let[@inline always] get t idx =
@@ -385,9 +362,15 @@ type error =
   | Partial
   | Fail of Error.t
 
-let run_parser ?pos ?len buf p =
-  let pos = Option.value pos ~default:0 in
-  let source = Source.of_bytes ~pos ?len buf in
+let run_parser ?(pos = 0) ?len buf p =
+  let total_length = Bigstring.length buf in
+  let len =
+    match len with
+    | Some v -> v
+    | None -> total_length - pos
+  in
+  Ordered_collection_common.check_pos_len_exn ~pos ~len ~total_length;
+  let source = Source.{ buffer = buf; pos; upper_bound = pos + len } in
   match p source with
   | exception Partial -> Error Partial
   | exception Fail m -> Error (Fail m)
