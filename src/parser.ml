@@ -146,6 +146,14 @@ module Source = struct
     in
     loop t pos str (String.length str)
   ;;
+
+  let[@inline always] consume_eol t =
+    if length t < 2 then raise_notrace Partial;
+    if Char.(
+         Bigstring.get t.buffer t.pos = '\r' && Bigstring.get t.buffer (t.pos + 1) = '\n')
+    then advance_unsafe t 2
+    else raise_notrace (Fail (Error.of_string "Expected EOL"))
+  ;;
 end
 
 let string str source =
@@ -166,7 +174,10 @@ let any_char source =
     c)
 ;;
 
-let eol source = string "\r\n" source
+(* let eol source = if Source.length source < 2 then raise_notrace Partial; if
+   Char.(Source.get_unsafe source 0 = '\r' && Source.get_unsafe source 1 = '\n') then
+   Source.advance_unsafe source 2 else raise_notrace (Fail (Error.of_string "Expected
+   EOL")) ;; *)
 
 let token source =
   let pos = Source.index source ' ' in
@@ -287,11 +298,11 @@ let header source =
 let rec headers source =
   if (not (Source.is_empty source)) && Char.(Source.get_unsafe source 0 = '\r')
   then (
-    eol source;
+    Source.consume_eol source;
     [])
   else (
     let header = header source in
-    eol source;
+    Source.consume_eol source;
     header :: headers source)
 ;;
 
@@ -366,7 +377,7 @@ let chunk_length source =
 
 let version source =
   let version = version source in
-  eol source;
+  Source.consume_eol source;
   version
 ;;
 
@@ -402,14 +413,14 @@ let chunk chunk_kind source =
     let chunk_length = chunk_length source in
     if chunk_length = 0
     then (
-      eol source;
+      Source.consume_eol source;
       Done)
     else (
       let current_chunk = take chunk_length source in
       let current_chunk_length = String.length current_chunk in
       if current_chunk_length = chunk_length
       then (
-        eol source;
+        Source.consume_eol source;
         Chunk_complete current_chunk)
       else Partial_chunk (current_chunk, chunk_length - current_chunk_length))
   | Continue_chunk len ->
@@ -417,7 +428,7 @@ let chunk chunk_kind source =
     let current_chunk_length = String.length chunk in
     if current_chunk_length = len
     then (
-      eol source;
+      Source.consume_eol source;
       Chunk_complete chunk)
     else Partial_chunk (chunk, len - current_chunk_length)
 ;;
