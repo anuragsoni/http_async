@@ -1,7 +1,7 @@
 (executable
  (name parser_bench)
  (modules parser_bench)
- (libraries core_bench core_unix.command_unix async_http))
+ (libraries core_bench core_unix.command_unix async_http memtrace))
 
 (executable
  (name server_bench)

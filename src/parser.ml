@@ -1,5 +1,8 @@
 open Core
 
+exception Fail of Error.t
+exception Partial
+
 let[@inline always] is_tchar = function
   | '0' .. '9'
   | 'a' .. 'z'
@@ -128,28 +131,9 @@ module Source = struct
     Bytes.unsafe_to_string ~no_mutation_while_string_reachable:b
   ;;
 
-  let index t ch =
+  let[@inline always] index t ch =
     let idx = Bigstring.unsafe_find t.buffer ch ~pos:t.pos ~len:(length t) in
     if idx < 0 then -1 else idx - t.pos
-  ;;
-
-  let for_all_is_tchar t ~pos ~len =
-    if pos < 0
-       || t.pos + pos >= t.upper_bound
-       || len < 0
-       || t.pos + pos + len > t.upper_bound
-    then
-      invalid_arg
-        (Format.asprintf
-           "Http_parser.Source.substring: Index out of bounds. Requested off: %d, len: %d"
-           pos
-           len);
-    let pos = ref (t.pos + pos) in
-    let len = t.pos + len in
-    while !pos < len && is_tchar (Bigstring.get t.buffer !pos) do
-      incr pos
-    done;
-    !pos = len
   ;;
 
   let unsafe_memcmp t pos str =
@@ -163,9 +147,6 @@ module Source = struct
     loop t pos str (String.length str)
   ;;
 end
-
-exception Fail of Error.t
-exception Partial
 
 let string str source =
   let len = String.length str in
@@ -216,41 +197,38 @@ let version source =
   | _ -> raise_notrace (Fail (Error.create "Invalid http version" ch sexp_of_char))
 ;;
 
+let invalid_header_err = Fail (Error.of_string "Invalid Header Key")
+
 let header source =
   let pos = Source.index source ':' in
   if pos = -1
   then raise_notrace Partial
   else if pos = 0
-  then raise_notrace (Fail (Error.of_string "Invalid header: Empty header key"))
-  else if Source.for_all_is_tchar source ~pos:0 ~len:pos
-  then (
-    let key = Source.to_string source ~pos:0 ~len:pos in
-    Source.advance_unsafe source (pos + 1);
-    while (not (Source.is_empty source)) && Char.(Source.get_unsafe source 0 = ' ') do
-      Source.advance_unsafe source 1
-    done;
-    let pos = Source.index source '\r' in
-    if pos = -1
-    then raise_notrace Partial
-    else (
-      let v = Source.to_string_trim source ~pos:0 ~len:pos in
-      Source.advance_unsafe source pos;
-      key, v))
-  else raise_notrace (Fail (Error.of_string "Invalid Header Key"))
+  then raise_notrace (Fail (Error.of_string "Invalid header: Empty header key"));
+  for idx = 0 to pos - 1 do
+    if not (is_tchar (Source.get_unsafe source idx)) then raise_notrace invalid_header_err
+  done;
+  let key = Source.to_string source ~pos:0 ~len:pos in
+  Source.advance_unsafe source (pos + 1);
+  while (not (Source.is_empty source)) && Char.(Source.get_unsafe source 0 = ' ') do
+    Source.advance_unsafe source 1
+  done;
+  let pos = Source.index source '\r' in
+  if pos = -1 then raise_notrace Partial;
+  let v = Source.to_string_trim source ~pos:0 ~len:pos in
+  Source.advance_unsafe source pos;
+  key, v
 ;;
 
-let headers =
-  let rec loop source acc =
-    if (not (Source.is_empty source)) && Char.(Source.get_unsafe source 0 = '\r')
-    then (
-      eol source;
-      Headers.of_rev_list (List.rev acc))
-    else (
-      let v = header source in
-      eol source;
-      loop source (v :: acc))
-  in
-  fun source -> loop source []
+let rec headers source =
+  if (not (Source.is_empty source)) && Char.(Source.get_unsafe source 0 = '\r')
+  then (
+    eol source;
+    [])
+  else (
+    let header = header source in
+    eol source;
+    header :: headers source)
 ;;
 
 let chunk_length source =
@@ -332,7 +310,7 @@ let request source =
   let meth = meth source in
   let path = token source in
   let version = version source in
-  let headers = headers source in
+  let headers = Headers.of_rev_list (headers source) in
   Request.create ~version ~headers meth path
 ;;
 
