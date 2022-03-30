@@ -191,7 +191,7 @@ let meth source =
          , source.![2]
          , source.![3]
          , source.![4]
-         , source.![4]
+         , source.![5]
          , source.![6] )
        with
       | 'C', 'O', 'N', 'N', 'E', 'C', 'T' -> `CONNECT
@@ -399,3 +399,7 @@ let run_parser ?pos ?len buf p =
 let parse_request ?pos ?len buf = run_parser ?pos ?len buf request
 let parse_chunk_length ?pos ?len buf = run_parser ?pos ?len buf chunk_length
 let parse_chunk ?pos ?len buf chunk_kind = run_parser ?pos ?len buf (chunk chunk_kind)
+
+module Private = struct
+  let parse_method payload = run_parser (Bigstring.of_string payload) meth
+end

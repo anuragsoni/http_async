@@ -26,13 +26,28 @@ type 'a success =
   { consumed : int
   ; value : 'a
   }
-[@@deriving sexp_of]
+[@@deriving sexp_of, compare]
 
 let parse_or_error res =
   match res with
   | Ok (value, consumed) -> Ok { value; consumed }
   | Error P.Partial -> Or_error.errorf "Partial"
   | Error (Fail error) -> Error (Error.tag error ~tag:"Parse error")
+;;
+
+let%test_unit "Can parse HTTP methods" =
+  let methods = Meth.all in
+  let methods_string = List.map methods ~f:Meth.to_string in
+  let result =
+    List.map
+      ~f:(fun m -> parse_or_error (Private.Parser.Private.parse_method (m ^ " ")))
+      methods_string
+  in
+  [%test_result: Meth.t success Or_error.t list]
+    result
+    ~expect:
+      (List.map methods ~f:(fun m ->
+           Ok { value = m; consumed = String.length (Meth.to_string m) + 1 }))
 ;;
 
 let%expect_test "can parse single request" =
