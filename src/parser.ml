@@ -166,7 +166,7 @@ let any_char source =
     c)
 ;;
 
-let eol = string "\r\n"
+let eol source = string "\r\n" source
 
 let token source =
   let pos = Source.index source ' ' in
@@ -178,11 +178,75 @@ let token source =
     res)
 ;;
 
+let[@inline always] ( .![] ) source idx = Source.get_unsafe source idx
+let invalid_method = Fail (Error.of_string "Invalid Method")
+
 let meth source =
-  let token = token source in
-  match Meth.of_string token with
-  | Some m -> m
-  | None -> raise_notrace (Fail (Error.create "Invalid HTTP Method" token sexp_of_string))
+  let pos = Source.index source ' ' in
+  if pos = -1 then raise_notrace Partial;
+  let ( = ) = Char.( = ) in
+  let meth =
+    match pos with
+    | 3 ->
+      if source.![0] = 'G' && source.![1] = 'E' && source.![2] = 'T'
+      then `GET
+      else if source.![0] = 'P' && source.![1] = 'U' && source.![3] = 'T'
+      then `PUT
+      else raise_notrace invalid_method
+    | 4 ->
+      if source.![0] = 'H' && source.![1] = 'E' && source.![2] = 'A' && source.![3] = 'D'
+      then `HEAD
+      else if source.![0] = 'P'
+              && source.![1] = 'O'
+              && source.![2] = 'S'
+              && source.![3] = 'T'
+      then `POST
+      else raise_notrace invalid_method
+    | 5 ->
+      if source.![0] = 'P'
+         && source.![1] = 'A'
+         && source.![2] = 'T'
+         && source.![3] = 'C'
+         && source.![4] = 'H'
+      then `PATCH
+      else if source.![0] = 'T'
+              && source.![1] = 'R'
+              && source.![2] = 'A'
+              && source.![3] = 'C'
+              && source.![4] = 'E'
+      then `TRACE
+      else raise_notrace invalid_method
+    | 6 ->
+      if source.![0] = 'D'
+         && source.![1] = 'E'
+         && source.![2] = 'L'
+         && source.![3] = 'E'
+         && source.![4] = 'T'
+         && source.![5] = 'E'
+      then `DELETE
+      else raise_notrace invalid_method
+    | 7 ->
+      if source.![0] = 'C'
+         && source.![1] = 'O'
+         && source.![2] = 'N'
+         && source.![3] = 'N'
+         && source.![4] = 'E'
+         && source.![5] = 'C'
+         && source.![6] = 'T'
+      then `CONNECT
+      else if source.![0] = 'O'
+              && source.![1] = 'P'
+              && source.![2] = 'T'
+              && source.![3] = 'I'
+              && source.![4] = 'O'
+              && source.![5] = 'N'
+              && source.![6] = 'S'
+      then `OPTIONS
+      else raise_notrace invalid_method
+    | _ -> raise_notrace invalid_method
+  in
+  Source.advance_unsafe source (pos + 1);
+  meth
 ;;
 
 let version_source source =
