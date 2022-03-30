@@ -126,7 +126,7 @@ let%expect_test "can validate http version" =
   in
   print_s
     ([%sexp_of: Request.t success Or_error.t] (parse_or_error (P.parse_request req)));
-  [%expect {| (Error ("Parse error" ("Invalid http version" 4))) |}]
+  [%expect {| (Error ("Parse error" "Invalid HTTP Version")) |}]
 ;;
 
 let%expect_test "parse result indicates location of start of body" =

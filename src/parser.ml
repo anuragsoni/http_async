@@ -136,17 +136,6 @@ module Source = struct
     if idx < 0 then -1 else idx - t.pos
   ;;
 
-  let unsafe_memcmp t pos str =
-    let rec loop t pos str len =
-      if pos = len
-      then true
-      else
-        Char.equal (get_unsafe t pos) (String.unsafe_get str pos)
-        && loop t (pos + 1) str len
-    in
-    loop t pos str (String.length str)
-  ;;
-
   let[@inline always] consume_eol t =
     if length t < 2 then raise_notrace Partial;
     if Char.(
@@ -155,29 +144,6 @@ module Source = struct
     else raise_notrace (Fail (Error.of_string "Expected EOL"))
   ;;
 end
-
-let string str source =
-  let len = String.length str in
-  if Source.length source < len
-  then raise_notrace Partial
-  else if Source.unsafe_memcmp source 0 str
-  then Source.advance source len
-  else raise_notrace (Fail (Error.create "Could not match string" str sexp_of_string))
-;;
-
-let any_char source =
-  if Source.is_empty source
-  then raise_notrace Partial
-  else (
-    let c = Source.get_unsafe source 0 in
-    Source.advance_unsafe source 1;
-    c)
-;;
-
-(* let eol source = if Source.length source < 2 then raise_notrace Partial; if
-   Char.(Source.get_unsafe source 0 = '\r' && Source.get_unsafe source 1 = '\n') then
-   Source.advance_unsafe source 2 else raise_notrace (Fail (Error.of_string "Expected
-   EOL")) ;; *)
 
 let token source =
   let pos = Source.index source ' ' in
@@ -260,16 +226,21 @@ let meth source =
   meth
 ;;
 
-let version_source source =
-  string "HTTP/1." source;
-  any_char source
-;;
-
 let version source =
-  let ch = version_source source in
-  match ch with
-  | '1' -> Version.Http_1_1
-  | _ -> raise_notrace (Fail (Error.create "Invalid http version" ch sexp_of_char))
+  if Source.length source < 8 then raise_notrace Partial;
+  let ( = ) = Char.( = ) in
+  if source.![0] = 'H'
+     && source.![1] = 'T'
+     && source.![2] = 'T'
+     && source.![3] = 'P'
+     && source.![4] = '/'
+     && source.![5] = '1'
+     && source.![6] = '.'
+     && source.![7] = '1'
+  then (
+    Source.advance_unsafe source 8;
+    Version.Http_1_1)
+  else raise_notrace (Fail (Error.of_string "Invalid HTTP Version"))
 ;;
 
 let invalid_header_err = Fail (Error.of_string "Invalid Header Key")
