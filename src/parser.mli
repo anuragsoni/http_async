@@ -26,3 +26,7 @@ val parse_chunk
   -> Bigstring.t
   -> chunk_kind
   -> (chunk_parser_result * int, error) result
+
+module Private : sig
+  val parse_method : string -> (Meth.t * int, error) result
+end

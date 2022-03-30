@@ -1,5 +1,8 @@
 open Core
 
+exception Fail of Error.t
+exception Partial
+
 let[@inline always] is_tchar = function
   | '0' .. '9'
   | 'a' .. 'z'
@@ -128,64 +131,19 @@ module Source = struct
     Bytes.unsafe_to_string ~no_mutation_while_string_reachable:b
   ;;
 
-  let index t ch =
+  let[@inline always] index t ch =
     let idx = Bigstring.unsafe_find t.buffer ch ~pos:t.pos ~len:(length t) in
     if idx < 0 then -1 else idx - t.pos
   ;;
 
-  let for_all_is_tchar t ~pos ~len =
-    if pos < 0
-       || t.pos + pos >= t.upper_bound
-       || len < 0
-       || t.pos + pos + len > t.upper_bound
-    then
-      invalid_arg
-        (Format.asprintf
-           "Http_parser.Source.substring: Index out of bounds. Requested off: %d, len: %d"
-           pos
-           len);
-    let pos = ref (t.pos + pos) in
-    let len = t.pos + len in
-    while !pos < len && is_tchar (Bigstring.get t.buffer !pos) do
-      incr pos
-    done;
-    !pos = len
-  ;;
-
-  let unsafe_memcmp t pos str =
-    let rec loop t pos str len =
-      if pos = len
-      then true
-      else
-        Char.equal (get_unsafe t pos) (String.unsafe_get str pos)
-        && loop t (pos + 1) str len
-    in
-    loop t pos str (String.length str)
+  let[@inline always] consume_eol t =
+    if length t < 2 then raise_notrace Partial;
+    if Char.(
+         Bigstring.get t.buffer t.pos = '\r' && Bigstring.get t.buffer (t.pos + 1) = '\n')
+    then advance_unsafe t 2
+    else raise_notrace (Fail (Error.of_string "Expected EOL"))
   ;;
 end
-
-exception Fail of Error.t
-exception Partial
-
-let string str source =
-  let len = String.length str in
-  if Source.length source < len
-  then raise_notrace Partial
-  else if Source.unsafe_memcmp source 0 str
-  then Source.advance source len
-  else raise_notrace (Fail (Error.create "Could not match string" str sexp_of_string))
-;;
-
-let any_char source =
-  if Source.is_empty source
-  then raise_notrace Partial
-  else (
-    let c = Source.get_unsafe source 0 in
-    Source.advance_unsafe source 1;
-    c)
-;;
-
-let eol = string "\r\n"
 
 let token source =
   let pos = Source.index source ' ' in
@@ -197,60 +155,103 @@ let token source =
     res)
 ;;
 
-let meth source =
-  let token = token source in
-  match Meth.of_string token with
-  | Some m -> m
-  | None -> raise_notrace (Fail (Error.create "Invalid HTTP Method" token sexp_of_string))
-;;
+let[@inline always] ( .![] ) source idx = Source.get_unsafe source idx
+let invalid_method = Fail (Error.of_string "Invalid Method")
 
-let version_source source =
-  string "HTTP/1." source;
-  any_char source
+let meth source =
+  let pos = Source.index source ' ' in
+  if pos = -1 then raise_notrace Partial;
+  let meth =
+    match pos with
+    | 3 ->
+      (match source.![0], source.![1], source.![2] with
+      | 'G', 'E', 'T' -> `GET
+      | 'P', 'U', 'T' -> `PUT
+      | _ -> raise_notrace invalid_method)
+    | 4 ->
+      (match source.![0], source.![1], source.![2], source.![3] with
+      | 'H', 'E', 'A', 'D' -> `HEAD
+      | 'P', 'O', 'S', 'T' -> `POST
+      | _ -> raise_notrace invalid_method)
+    | 5 ->
+      (match source.![0], source.![1], source.![2], source.![3], source.![4] with
+      | 'P', 'A', 'T', 'C', 'H' -> `PATCH
+      | 'T', 'R', 'A', 'C', 'E' -> `TRACE
+      | _ -> raise_notrace invalid_method)
+    | 6 ->
+      (match
+         source.![0], source.![1], source.![2], source.![3], source.![4], source.![5]
+       with
+      | 'D', 'E', 'L', 'E', 'T', 'E' -> `DELETE
+      | _ -> raise_notrace invalid_method)
+    | 7 ->
+      (match
+         ( source.![0]
+         , source.![1]
+         , source.![2]
+         , source.![3]
+         , source.![4]
+         , source.![5]
+         , source.![6] )
+       with
+      | 'C', 'O', 'N', 'N', 'E', 'C', 'T' -> `CONNECT
+      | 'O', 'P', 'T', 'I', 'O', 'N', 'S' -> `OPTIONS
+      | _ -> raise_notrace invalid_method)
+    | _ -> raise_notrace invalid_method
+  in
+  Source.advance_unsafe source (pos + 1);
+  meth
 ;;
 
 let version source =
-  let ch = version_source source in
-  match ch with
-  | '1' -> Version.Http_1_1
-  | _ -> raise_notrace (Fail (Error.create "Invalid http version" ch sexp_of_char))
+  if Source.length source < 8 then raise_notrace Partial;
+  let ( = ) = Char.( = ) in
+  if source.![0] = 'H'
+     && source.![1] = 'T'
+     && source.![2] = 'T'
+     && source.![3] = 'P'
+     && source.![4] = '/'
+     && source.![5] = '1'
+     && source.![6] = '.'
+     && source.![7] = '1'
+  then (
+    Source.advance_unsafe source 8;
+    Version.Http_1_1)
+  else raise_notrace (Fail (Error.of_string "Invalid HTTP Version"))
 ;;
+
+let invalid_header_err = Fail (Error.of_string "Invalid Header Key")
 
 let header source =
   let pos = Source.index source ':' in
   if pos = -1
   then raise_notrace Partial
   else if pos = 0
-  then raise_notrace (Fail (Error.of_string "Invalid header: Empty header key"))
-  else if Source.for_all_is_tchar source ~pos:0 ~len:pos
-  then (
-    let key = Source.to_string source ~pos:0 ~len:pos in
-    Source.advance_unsafe source (pos + 1);
-    while (not (Source.is_empty source)) && Char.(Source.get_unsafe source 0 = ' ') do
-      Source.advance_unsafe source 1
-    done;
-    let pos = Source.index source '\r' in
-    if pos = -1
-    then raise_notrace Partial
-    else (
-      let v = Source.to_string_trim source ~pos:0 ~len:pos in
-      Source.advance_unsafe source pos;
-      key, v))
-  else raise_notrace (Fail (Error.of_string "Invalid Header Key"))
+  then raise_notrace (Fail (Error.of_string "Invalid header: Empty header key"));
+  for idx = 0 to pos - 1 do
+    if not (is_tchar (Source.get_unsafe source idx)) then raise_notrace invalid_header_err
+  done;
+  let key = Source.to_string source ~pos:0 ~len:pos in
+  Source.advance_unsafe source (pos + 1);
+  while (not (Source.is_empty source)) && Char.(Source.get_unsafe source 0 = ' ') do
+    Source.advance_unsafe source 1
+  done;
+  let pos = Source.index source '\r' in
+  if pos = -1 then raise_notrace Partial;
+  let v = Source.to_string_trim source ~pos:0 ~len:pos in
+  Source.advance_unsafe source pos;
+  key, v
 ;;
 
-let headers =
-  let rec loop source acc =
-    if (not (Source.is_empty source)) && Char.(Source.get_unsafe source 0 = '\r')
-    then (
-      eol source;
-      Headers.of_rev_list (List.rev acc))
-    else (
-      let v = header source in
-      eol source;
-      loop source (v :: acc))
-  in
-  fun source -> loop source []
+let rec headers source =
+  if (not (Source.is_empty source)) && Char.(Source.get_unsafe source 0 = '\r')
+  then (
+    Source.consume_eol source;
+    [])
+  else (
+    let header = header source in
+    Source.consume_eol source;
+    header :: headers source)
 ;;
 
 let chunk_length source =
@@ -324,7 +325,7 @@ let chunk_length source =
 
 let version source =
   let version = version source in
-  eol source;
+  Source.consume_eol source;
   version
 ;;
 
@@ -332,7 +333,7 @@ let request source =
   let meth = meth source in
   let path = token source in
   let version = version source in
-  let headers = headers source in
+  let headers = Headers.of_rev_list (headers source) in
   Request.create ~version ~headers meth path
 ;;
 
@@ -360,14 +361,14 @@ let chunk chunk_kind source =
     let chunk_length = chunk_length source in
     if chunk_length = 0
     then (
-      eol source;
+      Source.consume_eol source;
       Done)
     else (
       let current_chunk = take chunk_length source in
       let current_chunk_length = String.length current_chunk in
       if current_chunk_length = chunk_length
       then (
-        eol source;
+        Source.consume_eol source;
         Chunk_complete current_chunk)
       else Partial_chunk (current_chunk, chunk_length - current_chunk_length))
   | Continue_chunk len ->
@@ -375,7 +376,7 @@ let chunk chunk_kind source =
     let current_chunk_length = String.length chunk in
     if current_chunk_length = len
     then (
-      eol source;
+      Source.consume_eol source;
       Chunk_complete chunk)
     else Partial_chunk (chunk, len - current_chunk_length)
 ;;
@@ -398,3 +399,7 @@ let run_parser ?pos ?len buf p =
 let parse_request ?pos ?len buf = run_parser ?pos ?len buf request
 let parse_chunk_length ?pos ?len buf = run_parser ?pos ?len buf chunk_length
 let parse_chunk ?pos ?len buf chunk_kind = run_parser ?pos ?len buf (chunk chunk_kind)
+
+module Private = struct
+  let parse_method payload = run_parser (Bigstring.of_string payload) meth
+end

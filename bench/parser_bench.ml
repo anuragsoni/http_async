@@ -41,4 +41,7 @@ let tests =
   ]
 ;;
 
-let () = Command_unix.run (Bench.make_command tests)
+let () =
+  Memtrace.trace_if_requested ();
+  Command_unix.run (Bench.make_command tests)
+;;
