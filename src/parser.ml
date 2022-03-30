@@ -161,65 +161,42 @@ let invalid_method = Fail (Error.of_string "Invalid Method")
 let meth source =
   let pos = Source.index source ' ' in
   if pos = -1 then raise_notrace Partial;
-  let ( = ) = Char.( = ) in
   let meth =
     match pos with
     | 3 ->
-      if source.![0] = 'G' && source.![1] = 'E' && source.![2] = 'T'
-      then `GET
-      else if source.![0] = 'P' && source.![1] = 'U' && source.![3] = 'T'
-      then `PUT
-      else raise_notrace invalid_method
+      (match source.![0], source.![1], source.![2] with
+      | 'G', 'E', 'T' -> `GET
+      | 'P', 'U', 'T' -> `PUT
+      | _ -> raise_notrace invalid_method)
     | 4 ->
-      if source.![0] = 'H' && source.![1] = 'E' && source.![2] = 'A' && source.![3] = 'D'
-      then `HEAD
-      else if source.![0] = 'P'
-              && source.![1] = 'O'
-              && source.![2] = 'S'
-              && source.![3] = 'T'
-      then `POST
-      else raise_notrace invalid_method
+      (match source.![0], source.![1], source.![2], source.![3] with
+      | 'H', 'E', 'A', 'D' -> `HEAD
+      | 'P', 'O', 'S', 'T' -> `POST
+      | _ -> raise_notrace invalid_method)
     | 5 ->
-      if source.![0] = 'P'
-         && source.![1] = 'A'
-         && source.![2] = 'T'
-         && source.![3] = 'C'
-         && source.![4] = 'H'
-      then `PATCH
-      else if source.![0] = 'T'
-              && source.![1] = 'R'
-              && source.![2] = 'A'
-              && source.![3] = 'C'
-              && source.![4] = 'E'
-      then `TRACE
-      else raise_notrace invalid_method
+      (match source.![0], source.![1], source.![2], source.![3], source.![4] with
+      | 'P', 'A', 'T', 'C', 'H' -> `PATCH
+      | 'T', 'R', 'A', 'C', 'E' -> `TRACE
+      | _ -> raise_notrace invalid_method)
     | 6 ->
-      if source.![0] = 'D'
-         && source.![1] = 'E'
-         && source.![2] = 'L'
-         && source.![3] = 'E'
-         && source.![4] = 'T'
-         && source.![5] = 'E'
-      then `DELETE
-      else raise_notrace invalid_method
+      (match
+         source.![0], source.![1], source.![2], source.![3], source.![4], source.![5]
+       with
+      | 'D', 'E', 'L', 'E', 'T', 'E' -> `DELETE
+      | _ -> raise_notrace invalid_method)
     | 7 ->
-      if source.![0] = 'C'
-         && source.![1] = 'O'
-         && source.![2] = 'N'
-         && source.![3] = 'N'
-         && source.![4] = 'E'
-         && source.![5] = 'C'
-         && source.![6] = 'T'
-      then `CONNECT
-      else if source.![0] = 'O'
-              && source.![1] = 'P'
-              && source.![2] = 'T'
-              && source.![3] = 'I'
-              && source.![4] = 'O'
-              && source.![5] = 'N'
-              && source.![6] = 'S'
-      then `OPTIONS
-      else raise_notrace invalid_method
+      (match
+         ( source.![0]
+         , source.![1]
+         , source.![2]
+         , source.![3]
+         , source.![4]
+         , source.![4]
+         , source.![6] )
+       with
+      | 'C', 'O', 'N', 'N', 'E', 'C', 'T' -> `CONNECT
+      | 'O', 'P', 'T', 'I', 'O', 'N', 'S' -> `OPTIONS
+      | _ -> raise_notrace invalid_method)
     | _ -> raise_notrace invalid_method
   in
   Source.advance_unsafe source (pos + 1);
