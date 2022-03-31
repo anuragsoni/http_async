@@ -83,17 +83,6 @@ module Source = struct
   ;;
 
   let[@inline always] to_string_trim t ~pos ~len =
-    if pos < 0
-       || t.pos + pos >= t.upper_bound
-       || len < 0
-       || t.pos + pos + len > t.upper_bound
-    then
-      invalid_arg
-        (Format.asprintf
-           "Http_parser.Source.substring: Index out of bounds., Requested off: %d, len: \
-            %d"
-           pos
-           len);
     let last = ref (t.pos + len - 1) in
     let pos = ref (t.pos + pos) in
     while is_space (Bigstring.get t.buffer !pos) do
@@ -210,9 +199,6 @@ let header source =
   done;
   let key = Source.to_string source ~pos:0 ~len:pos in
   Source.advance_unsafe source (pos + 1);
-  while (not (Source.is_empty source)) && Char.(Source.get_unsafe source 0 = ' ') do
-    Source.advance_unsafe source 1
-  done;
   let pos = Source.index source '\r' in
   if pos = -1 then raise_notrace Partial;
   let v = Source.to_string_trim source ~pos:0 ~len:pos in
