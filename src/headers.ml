@@ -6,16 +6,24 @@ type t = (string, string) List.Assoc.t [@@deriving sexp]
 let of_rev_list xs = xs
 let of_list xs = List.rev xs
 let iter t ~f = List.iter t ~f:(fun (key, data) -> f ~key ~data)
-let mem t key = List.Assoc.mem ~equal:String.Caseless.equal t key
-let find t key = List.Assoc.find t key ~equal:String.Caseless.equal
 
-let find_multi t key =
-  let rec aux acc = function
-    | [] -> List.rev acc
-    | (k, v) :: xs when String.Caseless.equal k key -> aux (v :: acc) xs
-    | _ :: xs -> aux acc xs
-  in
-  aux [] t
+let rec mem t key =
+  match t with
+  | [] -> false
+  | (k, _) :: t -> String.Caseless.equal k key || mem t key
+;;
+
+let rec find t key =
+  match t with
+  | [] -> None
+  | (k, v) :: t -> if String.Caseless.equal k key then Some v else find t key
+;;
+
+let rec find_multi t key =
+  match t with
+  | [] -> []
+  | (k, v) :: t ->
+    if String.Caseless.equal k key then v :: find_multi t key else find_multi t key
 ;;
 
 let empty = []
