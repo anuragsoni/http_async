@@ -3,26 +3,28 @@ open Core
 exception Fail of Error.t
 exception Partial
 
-let[@inline always] is_tchar = function
-  | '0' .. '9'
-  | 'a' .. 'z'
-  | 'A' .. 'Z'
-  | '!'
-  | '#'
-  | '$'
-  | '%'
-  | '&'
-  | '\''
-  | '*'
-  | '+'
-  | '-'
-  | '.'
-  | '^'
-  | '_'
-  | '`'
-  | '|'
-  | '~' -> true
-  | _ -> false
+let tchar_map =
+  Array.init 256 ~f:(fun idx ->
+      match Char.of_int_exn idx with
+      | '0' .. '9'
+      | 'a' .. 'z'
+      | 'A' .. 'Z'
+      | '!'
+      | '#'
+      | '$'
+      | '%'
+      | '&'
+      | '\''
+      | '*'
+      | '+'
+      | '-'
+      | '.'
+      | '^'
+      | '_'
+      | '`'
+      | '|'
+      | '~' -> true
+      | _ -> false)
 ;;
 
 module Source = struct
@@ -32,41 +34,12 @@ module Source = struct
     ; upper_bound : int
     }
 
-  let[@inline always] get_unsafe t idx = Bigstring.get t.buffer (t.pos + idx)
-
-  let[@inline always] get t idx =
-    if idx < 0 || t.pos + idx >= t.upper_bound
-    then invalid_arg "Http_parser.Source.get: Index out of bounds";
-    Bigstring.get t.buffer (t.pos + idx)
-  ;;
-
-  let[@inline always] advance_unsafe t count = t.pos <- t.pos + count
-
-  let[@inline always] advance t count =
-    if count < 0 || t.pos + count > t.upper_bound
-    then
-      invalid_arg
-        (Printf.sprintf
-           "Http_parser.Source.advance: Index out of bounds. Requested count: %d"
-           count);
-    t.pos <- t.pos + count
-  ;;
-
+  let[@inline always] unsafe_get t idx = Bigstring.get t.buffer (t.pos + idx)
+  let[@inline always] unsafe_advance t count = t.pos <- t.pos + count
   let[@inline always] length t = t.upper_bound - t.pos
   let[@inline always] is_empty t = t.pos = t.upper_bound
 
   let[@inline always] to_string t ~pos ~len =
-    if pos < 0
-       || t.pos + pos >= t.upper_bound
-       || len < 0
-       || t.pos + pos + len > t.upper_bound
-    then
-      invalid_arg
-        (Format.asprintf
-           "Http_parser.Source.substring: Index out of bounds., Requested off: %d, len: \
-            %d"
-           pos
-           len);
     let b = Bytes.create len in
     Bigstring.To_bytes.unsafe_blit
       ~src:t.buffer
@@ -106,22 +79,31 @@ module Source = struct
     if length t < 2 then raise_notrace Partial;
     if Char.(
          Bigstring.get t.buffer t.pos = '\r' && Bigstring.get t.buffer (t.pos + 1) = '\n')
-    then advance_unsafe t 2
+    then unsafe_advance t 2
     else raise_notrace (Fail (Error.of_string "Expected EOL"))
+  ;;
+
+  let parse_header tchar_map source =
+    let pos = index source ':' in
+    if pos = -1
+    then raise_notrace Partial
+    else if pos = 0
+    then raise_notrace (Fail (Error.of_string "Invalid header: Empty header key"));
+    for idx = 0 to pos - 1 do
+      if not (Array.unsafe_get tchar_map (Char.to_int (unsafe_get source idx)))
+      then raise_notrace (Fail (Error.of_string "Invalid Header Key"))
+    done;
+    let key = to_string source ~pos:0 ~len:pos in
+    unsafe_advance source (pos + 1);
+    let pos = index source '\r' in
+    if pos = -1 then raise_notrace Partial;
+    let v = to_string_trim source ~pos:0 ~len:pos in
+    unsafe_advance source pos;
+    key, v
   ;;
 end
 
-let token source =
-  let pos = Source.index source ' ' in
-  if pos = -1
-  then raise_notrace Partial
-  else (
-    let res = Source.to_string source ~pos:0 ~len:pos in
-    Source.advance source (pos + 1);
-    res)
-;;
-
-let[@inline always] ( .![] ) source idx = Source.get_unsafe source idx
+let[@inline always] ( .![] ) source idx = Source.unsafe_get source idx
 let invalid_method = Fail (Error.of_string "Invalid Method")
 
 let meth source =
@@ -165,54 +147,17 @@ let meth source =
       | _ -> raise_notrace invalid_method)
     | _ -> raise_notrace invalid_method
   in
-  Source.advance_unsafe source (pos + 1);
+  Source.unsafe_advance source (pos + 1);
   meth
 ;;
 
-let version source =
-  if Source.length source < 8 then raise_notrace Partial;
-  let ( = ) = Char.( = ) in
-  if source.![0] = 'H'
-     && source.![1] = 'T'
-     && source.![2] = 'T'
-     && source.![3] = 'P'
-     && source.![4] = '/'
-     && source.![5] = '1'
-     && source.![6] = '.'
-     && source.![7] = '1'
-  then (
-    Source.advance_unsafe source 8;
-    Version.Http_1_1)
-  else raise_notrace (Fail (Error.of_string "Invalid HTTP Version"))
-;;
-
-let invalid_header_err = Fail (Error.of_string "Invalid Header Key")
-
-let header source =
-  let pos = Source.index source ':' in
-  if pos = -1
-  then raise_notrace Partial
-  else if pos = 0
-  then raise_notrace (Fail (Error.of_string "Invalid header: Empty header key"));
-  for idx = 0 to pos - 1 do
-    if not (is_tchar (Source.get_unsafe source idx)) then raise_notrace invalid_header_err
-  done;
-  let key = Source.to_string source ~pos:0 ~len:pos in
-  Source.advance_unsafe source (pos + 1);
-  let pos = Source.index source '\r' in
-  if pos = -1 then raise_notrace Partial;
-  let v = Source.to_string_trim source ~pos:0 ~len:pos in
-  Source.advance_unsafe source pos;
-  key, v
-;;
-
 let rec headers source =
-  if (not (Source.is_empty source)) && Char.(Source.get_unsafe source 0 = '\r')
+  if (not (Source.is_empty source)) && Char.(Source.unsafe_get source 0 = '\r')
   then (
     Source.consume_eol source;
     [])
   else (
-    let header = header source in
+    let header = Source.parse_header tchar_map source in
     Source.consume_eol source;
     header :: headers source)
 ;;
@@ -234,8 +179,8 @@ let chunk_length source =
       stop := true;
       state := `Chunk_too_big)
     else (
-      let ch = Source.get source 0 in
-      Source.advance source 1;
+      let ch = Source.unsafe_get source 0 in
+      Source.unsafe_advance source 1;
       incr count;
       match ch with
       | '0' .. '9' as ch when !processing_chunk ->
@@ -257,9 +202,9 @@ let chunk_length source =
         then (
           stop := true;
           state := `Partial)
-        else if Char.(Source.get source 0 = '\n')
+        else if Char.(Source.unsafe_get source 0 = '\n')
         then (
-          Source.advance source 1;
+          Source.unsafe_advance source 1;
           stop := true)
         else (
           stop := true;
@@ -287,9 +232,28 @@ let chunk_length source =
 ;;
 
 let version source =
-  let version = version source in
-  Source.consume_eol source;
-  version
+  if Source.length source < 8 then raise_notrace Partial;
+  if Char.equal source.![0] 'H'
+     && Char.equal source.![1] 'T'
+     && Char.equal source.![2] 'T'
+     && Char.equal source.![3] 'P'
+     && Char.equal source.![4] '/'
+     && Char.equal source.![5] '1'
+     && Char.equal source.![6] '.'
+     && Char.equal source.![7] '1'
+  then (
+    Source.unsafe_advance source 8;
+    Source.consume_eol source;
+    Version.Http_1_1)
+  else raise_notrace (Fail (Error.of_string "Invalid HTTP Version"))
+;;
+
+let token source =
+  let pos = Source.index source ' ' in
+  if pos = -1 then raise_notrace Partial;
+  let res = Source.to_string source ~pos:0 ~len:pos in
+  Source.unsafe_advance source (pos + 1);
+  res
 ;;
 
 let request source =
@@ -305,7 +269,7 @@ let take len source =
   let to_consume = min len available in
   if to_consume = 0 then raise_notrace Partial;
   let payload = Source.to_string source ~pos:0 ~len:to_consume in
-  Source.advance source to_consume;
+  Source.unsafe_advance source to_consume;
   payload
 ;;
 
