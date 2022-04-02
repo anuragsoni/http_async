@@ -29,11 +29,11 @@ let hex_chunk_size = Bigstring.of_string (Printf.sprintf "%s\r\n" hex_str)
 
 let tests =
   [ Bench.Test.create ~name:"H1 (httparse example)" (fun () ->
-        match Async_http.Private.Parser.parse_request req with
+        match Http_async.Private.Parser.parse_request req with
         | Error _ -> assert false
         | Ok _ -> ())
   ; Bench.Test.create ~name:"Parse chunk size" (fun () ->
-        match Async_http.Private.Parser.parse_chunk_length hex_chunk_size with
+        match Http_async.Private.Parser.parse_chunk_length hex_chunk_size with
         | Error _ -> assert false
         | Ok _ -> ())
   ; Bench.Test.create ~name:"Parse hex number" (fun () ->

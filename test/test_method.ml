@@ -1,5 +1,5 @@
 open Core
-open Async_http
+open Http_async
 
 let%test_unit "Http Methods can be coverted to strings and back" =
   let a = Meth.all in

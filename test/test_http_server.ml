@@ -1,7 +1,7 @@
 open! Core
 open! Async
 open! Shuttle
-open Async_http
+open Http_async
 
 let default_service _ = Service.respond_string "Hello World"
 
@@ -18,7 +18,6 @@ let test_post_req_with_fixed_body =
 ;;
 
 let%expect_test "test simple server" =
-  let open Async_http in
   let stdout = Lazy.force Writer.stdout in
   let handler request =
     let body = Service.body request in
@@ -34,8 +33,7 @@ let%expect_test "test simple server" =
   let%bind read_from_writer, writer = pipe () in
   let reader_pipe = Input_channel.pipe read_from_writer in
   let finished = Ivar.create () in
-  (Async_http.Server.run_server_loop handler reader writer
-  >>> fun () -> Ivar.fill finished ());
+  (Server.run_server_loop handler reader writer >>> fun () -> Ivar.fill finished ());
   Output_channel.write write_to_reader test_post_req_with_fixed_body;
   Output_channel.schedule_flush write_to_reader;
   let%bind () = Ivar.read finished in
@@ -59,8 +57,7 @@ let%expect_test "test_default_error_handler" =
   let%bind read_from_writer, writer = pipe () in
   let reader_pipe = Input_channel.pipe read_from_writer in
   let finished = Ivar.create () in
-  (Async_http.Server.run_server_loop service reader writer
-  >>> fun () -> Ivar.fill finished ());
+  (Server.run_server_loop service reader writer >>> fun () -> Ivar.fill finished ());
   Output_channel.write write_to_reader test_post_req_with_fixed_body;
   Output_channel.schedule_flush write_to_reader;
   let%bind () = Ivar.read finished in
@@ -74,7 +71,7 @@ let%expect_test "test_default_error_handler" =
 
 let%expect_test "test_custom_error_handler" =
   let error_handler ?exn:_ status =
-    Async_http.Service.respond_string ~status "Something bad happened"
+    Service.respond_string ~status "Something bad happened"
   in
   let stdout = Lazy.force Writer.stdout in
   let service _request = failwith "ERROR" in
@@ -82,7 +79,7 @@ let%expect_test "test_custom_error_handler" =
   let%bind read_from_writer, writer = pipe () in
   let reader_pipe = Input_channel.pipe read_from_writer in
   let finished = Ivar.create () in
-  (Async_http.Server.run_server_loop ~error_handler service reader writer
+  (Server.run_server_loop ~error_handler service reader writer
   >>> fun () -> Ivar.fill finished ());
   Output_channel.write write_to_reader test_post_req_with_fixed_body;
   Output_channel.schedule_flush write_to_reader;
@@ -109,7 +106,6 @@ let test_post_req_with_chunked_body =
 let%expect_test "streaming bodies" =
   let stdout = Lazy.force Writer.stdout in
   let service request =
-    let open Async_http in
     let body = Service.body request in
     Service.respond_stream body
   in
@@ -117,8 +113,7 @@ let%expect_test "streaming bodies" =
   let%bind read_from_writer, writer = pipe () in
   let reader_pipe = Input_channel.pipe read_from_writer in
   let finished = Ivar.create () in
-  (Async_http.Server.run_server_loop service reader writer
-  >>> fun () -> Ivar.fill finished ());
+  (Server.run_server_loop service reader writer >>> fun () -> Ivar.fill finished ());
   Output_channel.write write_to_reader test_post_req_with_chunked_body;
   Output_channel.schedule_flush write_to_reader;
   let%bind () = Output_channel.close write_to_reader in
@@ -138,7 +133,7 @@ let%expect_test "bad transfer encoding header" =
   let%bind read_from_writer, writer = pipe () in
   let reader_pipe = Input_channel.pipe read_from_writer in
   let finished = Ivar.create () in
-  (Async_http.Server.run_server_loop default_service reader writer
+  (Server.run_server_loop default_service reader writer
   >>> fun () -> Ivar.fill finished ());
   Output_channel.write
     write_to_reader

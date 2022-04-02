@@ -1,5 +1,5 @@
 open! Core
-open Async_http
+open Http_async
 
 let req =
   "GET /wp-content/uploads/2010/03/hello-kitty-darth-vader-pink.jpg HTTP/1.1\r\n\
@@ -20,7 +20,7 @@ let req =
 
 let req = Bigstring.of_string req
 
-module P = Async_http.Private.Parser
+module P = Private.Parser
 
 type 'a success =
   { consumed : int

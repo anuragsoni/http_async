@@ -8,7 +8,7 @@ module Response = Response
 module Meth = Meth
 module Headers = Headers
 
-(** [Service] is the core abstraction that represents an HTTP server within async_http.*)
+(** [Service] is the core abstraction that represents an HTTP server within http_async.*)
 module Service : sig
   type request [@@deriving sexp_of]
   type response [@@deriving sexp_of]
