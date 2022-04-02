@@ -63,9 +63,9 @@ let command =
   Command.basic
     ~summary:"Generate list of header names"
     Command.Let_syntax.(
-      let%map_open filename = anon ("filename" %: Filename.arg_type)
+      let%map_open filename = anon ("filename" %: Filename_unix.arg_type)
       and mli = flag "-mli" no_arg ~doc:" Generate mli" in
       fun () -> codegen filename mli)
 ;;
 
-let () = Command.run command
+let () = Command_unix.run command

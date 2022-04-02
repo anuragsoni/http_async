@@ -20,10 +20,7 @@
   (http-server http async ocaml))
  (depends
   (ocaml
-   (>= 4.08.0))
-  shuttle
-  ppxlib
-  (ppx_jane
-   (and
-    (>= v0.14)
-    (< v0.15)))))
+   (>= 4.11.0))
+  (shuttle
+   (>= 0.4.0))
+  ppxlib))

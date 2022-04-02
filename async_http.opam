@@ -9,10 +9,9 @@ homepage: "https://github.com/anuragsoni/async-http"
 bug-reports: "https://github.com/anuragsoni/async-http/issues"
 depends: [
   "dune" {>= "2.9"}
-  "ocaml" {>= "4.08.0"}
-  "shuttle"
+  "ocaml" {>= "4.11.0"}
+  "shuttle" {>= "0.4.0"}
   "ppxlib"
-  "ppx_jane" {>= "v0.14" & < "v0.15"}
   "odoc" {with-doc}
 ]
 build: [
