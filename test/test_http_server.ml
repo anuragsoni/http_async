@@ -39,16 +39,14 @@ let%expect_test "test simple server" =
   Output_channel.write write_to_reader test_post_req_with_fixed_body;
   Output_channel.schedule_flush write_to_reader;
   let%bind () = Ivar.read finished in
-  let%bind () =
-    [%expect
-      {|
+  [%expect
+    {|
     Hello
     (((meth POST) (path /hello) (version Http_1_1)
       (headers ((Host www.example.com) (Content-Length 5))))
-     ((encoding (Fixed 5)) (reader <opaque>))) |}]
-  in
+     ((encoding (Fixed 5)) (reader <opaque>))) |}];
   let%bind () = Output_channel.close writer in
-  let%bind () =
+  let%map () =
     Pipe.iter_without_pushback reader_pipe ~f:(fun v -> Writer.writef stdout "%S" v)
   in
   [%expect {| "HTTP/1.1 200 \r\ncontent-length: 5\r\nconnection: close\r\n\r\nWorld" |}]
@@ -67,7 +65,7 @@ let%expect_test "test_default_error_handler" =
   Output_channel.schedule_flush write_to_reader;
   let%bind () = Ivar.read finished in
   let%bind () = Output_channel.close writer in
-  let%bind () =
+  let%map () =
     Pipe.iter_without_pushback reader_pipe ~f:(fun chunk ->
         Writer.writef stdout "%S" chunk)
   in
@@ -90,7 +88,7 @@ let%expect_test "test_custom_error_handler" =
   Output_channel.schedule_flush write_to_reader;
   let%bind () = Ivar.read finished in
   let%bind () = Output_channel.close writer in
-  let%bind () =
+  let%map () =
     Pipe.iter_without_pushback reader_pipe ~f:(fun chunk ->
         Writer.writef stdout "%S" chunk)
   in
@@ -126,7 +124,7 @@ let%expect_test "streaming bodies" =
   let%bind () = Output_channel.close write_to_reader in
   let%bind () = Ivar.read finished in
   let%bind () = Output_channel.close writer in
-  let%bind () =
+  let%map () =
     Pipe.iter_without_pushback reader_pipe ~f:(fun chunk ->
         Writer.writef stdout "%S" chunk)
   in
@@ -152,7 +150,7 @@ let%expect_test "bad transfer encoding header" =
   Output_channel.schedule_flush write_to_reader;
   let%bind () = Ivar.read finished in
   let%bind () = Output_channel.close writer in
-  let%bind () =
+  let%map () =
     Pipe.iter_without_pushback reader_pipe ~f:(fun chunk ->
         Writer.writef stdout "%S" chunk)
   in
