@@ -1,6 +1,6 @@
 open! Core
 open! Async
-open Async_http
+open Http_async
 
 let () =
   Command_unix.run

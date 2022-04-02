@@ -1,11 +1,11 @@
 (lang dune 2.9)
 
-(name async_http)
+(name http_async)
 
 (generate_opam_files true)
 
 (source
- (github anuragsoni/async_http))
+ (github anuragsoni/http_async))
 
 (authors "Anurag Soni <anurag@sonianurag.com>")
 
@@ -14,10 +14,10 @@
 (license MIT)
 
 (package
- (name async_http)
+ (name http_async)
  (synopsis "Async web toolkit")
  (tags
-  (http-server http async ocaml))
+  (http-server http http1.1 async))
  (depends
   (ocaml
    (>= 4.11.0))

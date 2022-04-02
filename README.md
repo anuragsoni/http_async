@@ -1,4 +1,4 @@
-# Async_http
+# Http_async
 
 HTTP 1.1 server for async applications.
 
@@ -7,9 +7,8 @@ HTTP 1.1 server for async applications.
 This library isn't published to the opam repository yet so it requires pinning to the development version of dependencies.
 
 ```
-opam pin add -n shuttle.dev git+https://github.com/anuragsoni/shuttle.git
-opam pin add -n async_http.dev git+https://github.com/anuragsoni/async_http.git
-opam install async_http
+opam pin add -n http_async.dev git+https://github.com/anuragsoni/http_async.git
+opam install http_async
 ```
 
 ### Hello World
@@ -17,7 +16,7 @@ opam install async_http
 ```ocaml
 open! Core
 open! Async
-open Async_http
+open Http_async
 
 let () =
   Command_unix.run
@@ -33,12 +32,12 @@ let () =
 
 ### Routing?
 
-Async_http doesn't ship with a router. There are multiple routing libraries available on opam and using `async_http` with them should be fairly easy. As an example, integration with [ocaml-dispatch](https://github.com/inhabitedtype/ocaml-dispatch) can be done as so:
+Http_async doesn't ship with a router. There are multiple routing libraries available on opam and using `Http_async` with them should be fairly easy. As an example, integration with [ocaml-dispatch](https://github.com/inhabitedtype/ocaml-dispatch) can be done as so:
 
 ```ocaml
 open! Core
 open! Async
-open Async_http
+open Http_async
 
 let routes =
   let open Dispatch in
