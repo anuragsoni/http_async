@@ -11,7 +11,7 @@ depends: [
   "dune" {>= "2.9"}
   "ocaml" {>= "4.11.0"}
   "shuttle" {>= "0.4.0"}
-  "ppxlib"
+  "ppxlib" {>= "0.23.0"}
   "odoc" {with-doc}
 ]
 build: [

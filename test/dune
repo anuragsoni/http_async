@@ -1,6 +1,5 @@
 (library
  (name test_async_http)
- (inline_tests)
  (preprocess
   (pps ppx_jane))
  (package async_http)
