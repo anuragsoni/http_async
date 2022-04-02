@@ -2,7 +2,6 @@ open! Core
 open! Async
 open! Shuttle
 open Async_http
-module Expect_test_config = Expect_test_config_with_unit_expect
 
 let default_service _ = Service.respond_string "Hello World"
 
