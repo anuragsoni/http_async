@@ -5,7 +5,7 @@
 (generate_opam_files true)
 
 (source
- (github anuragsoni/async-http))
+ (github anuragsoni/async_http))
 
 (authors "Anurag Soni <anurag@sonianurag.com>")
 
