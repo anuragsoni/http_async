@@ -12,12 +12,11 @@ let keep_alive headers =
 ;;
 
 let write_response writer encoding res =
-  let module Writer = Output_channel in
-  Writer.write writer (Version.to_string (Response.version res));
-  Writer.write_char writer ' ';
-  Writer.write writer (Status.to_string (Response.status res));
-  Writer.write_char writer ' ';
-  Writer.write writer "\r\n";
+  Output_channel.write writer (Version.to_string (Response.version res));
+  Output_channel.write_char writer ' ';
+  Output_channel.write writer (Status.to_string (Response.status res));
+  Output_channel.write_char writer ' ';
+  Output_channel.write writer "\r\n";
   let headers = Response.headers res in
   let headers =
     match encoding with
@@ -31,12 +30,12 @@ let write_response writer encoding res =
   in
   Headers.iter
     ~f:(fun ~key ~data ->
-      Writer.write writer key;
-      Writer.write writer ": ";
-      Writer.write writer data;
-      Writer.write writer "\r\n")
+      Output_channel.write writer key;
+      Output_channel.write writer ": ";
+      Output_channel.write writer data;
+      Output_channel.write writer "\r\n")
     headers;
-  Writer.write writer "\r\n"
+  Output_channel.write writer "\r\n"
 ;;
 
 let default_error_handler ?exn:_ status =
