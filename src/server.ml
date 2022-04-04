@@ -3,10 +3,7 @@ open! Async
 open! Shuttle
 open Eager_deferred.Use
 
-type request = Request.t * Body.Reader.t
-type response = Response.t * Body.Writer.t
-type handler = request -> response Deferred.t
-type error_handler = ?exn:Exn.t -> Status.t -> response Deferred.t
+type error_handler = ?exn:Exn.t -> Status.t -> Service.response Deferred.t
 
 let keep_alive headers =
   match Headers.(find headers connection) with
