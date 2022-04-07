@@ -172,7 +172,8 @@ module Writer = struct
             Output_channel.flush writer >>> fun () -> Ivar.fill ivar ()
           | Stream xs ->
             let write_chunk = make_writer t in
-            Pipe.iter xs ~f:(fun buf -> write_chunk writer buf)
+            Pipe.iter ~flushed:Pipe.Flushed.When_value_processed xs ~f:(fun buf ->
+                write_chunk writer buf)
             >>> fun () ->
             if is_chunked t
             then (
