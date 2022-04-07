@@ -9,9 +9,9 @@ type chunk_kind =
   | Continue_chunk of int
 
 type chunk_parser_result =
-  | Chunk_complete of string
+  | Chunk_complete of Bigstring.t Core_unix.IOVec.t
   | Done
-  | Partial_chunk of string * int
+  | Partial_chunk of Bigstring.t Core_unix.IOVec.t * int
 
 (** Attempts to parse a buffer into a HTTP request. If successful, it returns the parsed
     request and an offset value that indicates the starting point of unconsumed content

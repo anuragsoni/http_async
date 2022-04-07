@@ -23,7 +23,7 @@ module Service : sig
   val meth : request -> Meth.t
 
   (** [body] returns the HTTP request body for a given request. *)
-  val body : request -> string Pipe.Reader.t
+  val body : request -> Bigstring.t Core_unix.IOVec.t Pipe.Reader.t
 
   (** [header request key] returns the last header value associates with [key] if one
       exists. *)
@@ -56,7 +56,7 @@ module Service : sig
   val respond_stream
     :  ?headers:(string * string) list
     -> ?status:Status.t
-    -> string Pipe.Reader.t
+    -> Bigstring.t Core_unix.IOVec.t Pipe.Reader.t
     -> response Deferred.t
 end
 

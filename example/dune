@@ -1,5 +1,5 @@
 (executables
- (names hello_world)
+ (names hello_world echo)
  (preprocess
   (pps ppx_jane))
  (libraries core core_unix.command_unix async shuttle http_async))

@@ -5,23 +5,39 @@ open Shuttle
 module Reader = struct
   type t =
     { encoding : [ `Chunked | `Fixed of int ]
-    ; reader : (string Pipe.Reader.t[@sexp.opaque])
+    ; reader : (Bigstring.t Core_unix.IOVec.t Pipe.Reader.t[@sexp.opaque])
     }
   [@@deriving sexp_of]
 
   let empty = { encoding = `Fixed 0; reader = Pipe.empty () }
 
   module Private = struct
+    let rec read_bigstring chan len =
+      let view = Input_channel.view chan in
+      if view.len > 0
+      then (
+        let to_read = min len view.len in
+        return (`Ok (Core_unix.IOVec.of_bigstring ~pos:view.pos ~len:to_read view.buf)))
+      else
+        Input_channel.refill chan
+        >>= function
+        | `Eof -> return `Eof
+        | `Ok | `Buffer_is_full -> read_bigstring chan len
+    ;;
+
     let fixed_reader len chan =
       Pipe.create_reader ~close_on_exception:false (fun writer ->
           Deferred.repeat_until_finished len (fun len ->
-              Input_channel.read chan len
+              read_bigstring chan len
               >>= function
               | `Eof -> return (`Finished ())
               | `Ok chunk ->
-                let consumed = String.length chunk in
+                let consumed = chunk.len in
                 Pipe.write_if_open writer chunk
                 >>= fun () ->
+                Pipe.downstream_flushed writer
+                >>= fun _ ->
+                Input_channel.consume chan chunk.len;
                 if consumed = len
                 then return (`Finished ())
                 else return (`Repeat (len - consumed))))
@@ -43,11 +59,15 @@ module Reader = struct
                 Input_channel.consume chan consumed;
                 (match parse_result with
                 | Parser.Chunk_complete chunk ->
-                  Pipe.write_if_open writer chunk >>| fun () -> `Repeat Parser.Start_chunk
+                  Pipe.write_if_open writer chunk
+                  >>= fun () ->
+                  Pipe.downstream_flushed writer >>| fun _ -> `Repeat Parser.Start_chunk
                 | Parser.Done -> return (`Finished ())
                 | Parser.Partial_chunk (chunk, to_consume) ->
                   Pipe.write_if_open writer chunk
-                  >>| fun () -> `Repeat (Parser.Continue_chunk to_consume))))
+                  >>= fun () ->
+                  Pipe.downstream_flushed writer
+                  >>| fun _ -> `Repeat (Parser.Continue_chunk to_consume))))
     ;;
 
     let get_transfer_encoding headers =
@@ -92,7 +112,7 @@ module Writer = struct
     | Empty
     | String of string
     | Bigstring of Bigstring.t
-    | Stream of (string Pipe.Reader.t[@sexp.opaque])
+    | Stream of (Bigstring.t Core_unix.IOVec.t Pipe.Reader.t[@sexp.opaque])
   [@@deriving sexp_of]
 
   type t =
@@ -124,19 +144,19 @@ module Writer = struct
         fun writer buf ->
           (* avoid writing empty payloads as that is used to indicate the end of a
              stream. *)
-          if String.is_empty buf
+          if buf.Core_unix.IOVec.len = 0
           then Deferred.unit
           else (
-            Output_channel.writef writer "%x\r\n" (String.length buf);
-            Output_channel.write writer buf;
+            Output_channel.writef writer "%x\r\n" buf.len;
+            Output_channel.write_bigstring writer buf.buf ~pos:buf.pos ~len:buf.len;
             Output_channel.write writer "\r\n";
             Output_channel.flush writer)
       | `Fixed _ ->
         fun writer buf ->
-          if String.is_empty buf
+          if buf.len = 0
           then Deferred.unit
           else (
-            Output_channel.write writer buf;
+            Output_channel.write_bigstring writer buf.buf ~pos:buf.pos ~len:buf.len;
             Output_channel.flush writer)
     ;;
 
