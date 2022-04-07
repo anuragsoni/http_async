@@ -50,6 +50,10 @@ module Source = struct
     Bytes.unsafe_to_string ~no_mutation_while_string_reachable:b
   ;;
 
+  let[@inline always] to_iovec t ~pos ~len =
+    Core_unix.IOVec.of_bigstring t.buffer ~pos:(t.pos + pos) ~len
+  ;;
+
   let[@inline always] is_space = function
     | ' ' | '\012' | '\n' | '\r' | '\t' -> true
     | _ -> false
@@ -268,7 +272,7 @@ let take len source =
   let available = Source.length source in
   let to_consume = min len available in
   if to_consume = 0 then raise_notrace Partial;
-  let payload = Source.to_string source ~pos:0 ~len:to_consume in
+  let payload = Source.to_iovec source ~pos:0 ~len:to_consume in
   Source.unsafe_advance source to_consume;
   payload
 ;;
@@ -278,9 +282,9 @@ type chunk_kind =
   | Continue_chunk of int
 
 type chunk_parser_result =
-  | Chunk_complete of string
+  | Chunk_complete of Bigstring.t Core_unix.IOVec.t
   | Done
-  | Partial_chunk of string * int
+  | Partial_chunk of Bigstring.t Core_unix.IOVec.t * int
 
 let chunk chunk_kind source =
   match chunk_kind with
@@ -292,7 +296,7 @@ let chunk chunk_kind source =
       Done)
     else (
       let current_chunk = take chunk_length source in
-      let current_chunk_length = String.length current_chunk in
+      let current_chunk_length = current_chunk.len in
       if current_chunk_length = chunk_length
       then (
         Source.consume_eol source;
@@ -300,7 +304,7 @@ let chunk chunk_kind source =
       else Partial_chunk (current_chunk, chunk_length - current_chunk_length))
   | Continue_chunk len ->
     let chunk = take len source in
-    let current_chunk_length = String.length chunk in
+    let current_chunk_length = chunk.len in
     if current_chunk_length = len
     then (
       Source.consume_eol source;
