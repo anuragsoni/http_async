@@ -11,11 +11,13 @@
 
 (maintainers "Anurag Soni <anurag@sonianurag.com>")
 
+(documentation "https://anuragsoni.github.io/http_async/")
+
 (license MIT)
 
 (package
  (name http_async)
- (synopsis "Async web toolkit")
+ (synopsis "Async library for HTTP/1.1 servers")
  (tags
   (http-server http http1.1 async))
  (depends
