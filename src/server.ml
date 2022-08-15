@@ -68,27 +68,27 @@ let run_server_loop ?(error_handler = default_error_handler) handle_request read
     | Ok (req, consumed) ->
       Input_channel.consume reader consumed;
       (match Body.Reader.Private.create req reader with
-      | Error _error ->
-        Logger.debug "Invalid request body";
-        error_handler `Bad_request
-        >>> fun (res, res_body) ->
-        write_response writer (Body.Writer.encoding res_body) res;
-        Body.Writer.Private.write res_body writer
-        >>> fun () ->
-        Output_channel.schedule_flush writer;
-        Ivar.fill finished ()
-      | Ok req_body ->
-        handle_request (req, req_body)
-        >>> fun (res, res_body) ->
-        let keep_alive =
-          keep_alive (Request.headers req) && keep_alive (Response.headers res)
-        in
-        write_response writer (Body.Writer.encoding res_body) res;
-        Body.Writer.Private.write res_body writer
-        >>> fun () ->
-        Body.Reader.drain req_body
-        >>> fun () ->
-        if keep_alive then loop reader writer handle_request else Ivar.fill finished ())
+       | Error _error ->
+         Logger.debug "Invalid request body";
+         error_handler `Bad_request
+         >>> fun (res, res_body) ->
+         write_response writer (Body.Writer.encoding res_body) res;
+         Body.Writer.Private.write res_body writer
+         >>> fun () ->
+         Output_channel.schedule_flush writer;
+         Ivar.fill finished ()
+       | Ok req_body ->
+         handle_request (req, req_body)
+         >>> fun (res, res_body) ->
+         let keep_alive =
+           keep_alive (Request.headers req) && keep_alive (Response.headers res)
+         in
+         write_response writer (Body.Writer.encoding res_body) res;
+         Body.Writer.Private.write res_body writer
+         >>> fun () ->
+         Body.Reader.drain req_body
+         >>> fun () ->
+         if keep_alive then loop reader writer handle_request else Ivar.fill finished ())
   in
   (Monitor.detach_and_get_next_error monitor
   >>> fun exn ->
@@ -97,19 +97,19 @@ let run_server_loop ?(error_handler = default_error_handler) handle_request read
   write_response writer (Body.Writer.encoding res_body) res;
   Body.Writer.Private.write res_body writer >>> fun () -> Ivar.fill finished ());
   Scheduler.within ~priority:Priority.Normal ~monitor (fun () ->
-      loop reader writer handle_request);
+    loop reader writer handle_request);
   Ivar.read finished
 ;;
 
 let run
-    ?(where_to_listen = Tcp.Where_to_listen.of_port 8080)
-    ?max_connections
-    ?(max_accepts_per_batch = 64)
-    ?backlog
-    ?socket
-    ?initial_buffer_size
-    ?error_handler
-    service
+  ?(where_to_listen = Tcp.Where_to_listen.of_port 8080)
+  ?max_connections
+  ?(max_accepts_per_batch = 64)
+  ?backlog
+  ?socket
+  ?initial_buffer_size
+  ?error_handler
+  service
   =
   Shuttle.Connection.listen
     ?input_buffer_size:initial_buffer_size
@@ -165,7 +165,7 @@ let run_command ?(interrupt = Deferred.never ()) ?readme ?error_handler ~summary
         choose
           [ choice interrupt (fun () -> `Shutdown)
           ; choice (Tcp.Server.close_finished_and_handlers_determined server) (fun () ->
-                `Closed)
+              `Closed)
           ]
         >>= function
         | `Shutdown -> Tcp.Server.close ~close_existing_connections:true server

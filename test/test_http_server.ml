@@ -23,7 +23,7 @@ let%expect_test "test simple server" =
     let body = Service.body request in
     let%bind () =
       Pipe.iter_without_pushback body ~f:(fun v ->
-          Writer.write_line stdout (Bigstring.to_string v.buf ~pos:v.pos ~len:v.len))
+        Writer.write_line stdout (Bigstring.to_string v.buf ~pos:v.pos ~len:v.len))
     in
     Writer.write_sexp ~hum:true stdout (Service.sexp_of_request request);
     Service.respond_string
@@ -65,7 +65,7 @@ let%expect_test "test_default_error_handler" =
   let%bind () = Output_channel.close writer in
   let%map () =
     Pipe.iter_without_pushback reader_pipe ~f:(fun chunk ->
-        Writer.writef stdout "%S" chunk)
+      Writer.writef stdout "%S" chunk)
   in
   [%expect {| "HTTP/1.1 500 \r\nConnection: close\r\nContent-Length: 0\r\n\r\n" |}]
 ;;
@@ -88,7 +88,7 @@ let%expect_test "test_custom_error_handler" =
   let%bind () = Output_channel.close writer in
   let%map () =
     Pipe.iter_without_pushback reader_pipe ~f:(fun chunk ->
-        Writer.writef stdout "%S" chunk)
+      Writer.writef stdout "%S" chunk)
   in
   [%expect {| "HTTP/1.1 500 \r\nContent-Length: 22\r\n\r\nSomething bad happened" |}]
 ;;
@@ -122,7 +122,7 @@ let%expect_test "streaming bodies" =
   let%bind () = Output_channel.close writer in
   let%map () =
     Pipe.iter_without_pushback reader_pipe ~f:(fun chunk ->
-        Writer.writef stdout "%S" chunk)
+      Writer.writef stdout "%S" chunk)
   in
   [%expect
     {| "HTTP/1.1 200 \r\nTransfer-Encoding: chunked\r\n\r\n5\r\nHello\r\n0\r\n\r\n" |}]
@@ -148,7 +148,7 @@ let%expect_test "bad transfer encoding header" =
   let%bind () = Output_channel.close writer in
   let%map () =
     Pipe.iter_without_pushback reader_pipe ~f:(fun chunk ->
-        Writer.writef stdout "%S" chunk)
+      Writer.writef stdout "%S" chunk)
   in
   [%expect {| "HTTP/1.1 400 \r\nConnection: close\r\nContent-Length: 0\r\n\r\n" |}]
 ;;

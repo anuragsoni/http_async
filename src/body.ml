@@ -27,47 +27,47 @@ module Reader = struct
 
     let fixed_reader len chan =
       Pipe.create_reader ~close_on_exception:false (fun writer ->
-          Deferred.repeat_until_finished len (fun len ->
-              read_bigstring chan len
-              >>= function
-              | `Eof -> return (`Finished ())
-              | `Ok chunk ->
-                let consumed = chunk.len in
-                Pipe.write_if_open writer chunk
-                >>= fun () ->
-                Pipe.downstream_flushed writer
-                >>= fun _ ->
-                Input_channel.consume chan chunk.len;
-                if consumed = len
-                then return (`Finished ())
-                else return (`Repeat (len - consumed))))
+        Deferred.repeat_until_finished len (fun len ->
+          read_bigstring chan len
+          >>= function
+          | `Eof -> return (`Finished ())
+          | `Ok chunk ->
+            let consumed = chunk.len in
+            Pipe.write_if_open writer chunk
+            >>= fun () ->
+            Pipe.downstream_flushed writer
+            >>= fun _ ->
+            Input_channel.consume chan chunk.len;
+            if consumed = len
+            then return (`Finished ())
+            else return (`Repeat (len - consumed))))
     ;;
 
     let chunked_reader chan =
       Pipe.create_reader ~close_on_exception:false (fun writer ->
-          Deferred.repeat_until_finished Parser.Start_chunk (fun state ->
-              let view = Input_channel.view chan in
-              match Parser.parse_chunk ~pos:view.pos ~len:view.len view.buf state with
-              | Error (Fail error) -> Error.raise error
-              | Error Partial ->
-                Input_channel.refill chan
-                >>| (function
-                | `Ok -> `Repeat state
-                | `Buffer_is_full -> `Finished ()
-                | `Eof -> `Finished ())
-              | Ok (parse_result, consumed) ->
-                Input_channel.consume chan consumed;
-                (match parse_result with
-                | Parser.Chunk_complete chunk ->
-                  Pipe.write_if_open writer chunk
-                  >>= fun () ->
-                  Pipe.downstream_flushed writer >>| fun _ -> `Repeat Parser.Start_chunk
-                | Parser.Done -> return (`Finished ())
-                | Parser.Partial_chunk (chunk, to_consume) ->
-                  Pipe.write_if_open writer chunk
-                  >>= fun () ->
-                  Pipe.downstream_flushed writer
-                  >>| fun _ -> `Repeat (Parser.Continue_chunk to_consume))))
+        Deferred.repeat_until_finished Parser.Start_chunk (fun state ->
+          let view = Input_channel.view chan in
+          match Parser.parse_chunk ~pos:view.pos ~len:view.len view.buf state with
+          | Error (Fail error) -> Error.raise error
+          | Error Partial ->
+            Input_channel.refill chan
+            >>| (function
+            | `Ok -> `Repeat state
+            | `Buffer_is_full -> `Finished ()
+            | `Eof -> `Finished ())
+          | Ok (parse_result, consumed) ->
+            Input_channel.consume chan consumed;
+            (match parse_result with
+             | Parser.Chunk_complete chunk ->
+               Pipe.write_if_open writer chunk
+               >>= fun () ->
+               Pipe.downstream_flushed writer >>| fun _ -> `Repeat Parser.Start_chunk
+             | Parser.Done -> return (`Finished ())
+             | Parser.Partial_chunk (chunk, to_consume) ->
+               Pipe.write_if_open writer chunk
+               >>= fun () ->
+               Pipe.downstream_flushed writer
+               >>| fun _ -> `Repeat (Parser.Continue_chunk to_consume))))
     ;;
 
     let get_transfer_encoding headers =
@@ -80,15 +80,15 @@ module Reader = struct
              ~compare:String.Caseless.compare
              (Headers.find_multi headers "Content-Length")
          with
-        | [] -> `Fixed 0
-        (* TODO: check for exceptions when converting to int *)
-        | [ x ] ->
-          let len =
-            try Int.of_string x with
-            | _ -> -1
-          in
-          if Int.(len >= 0) then `Fixed len else `Bad_request
-        | _ -> `Bad_request)
+         | [] -> `Fixed 0
+         (* TODO: check for exceptions when converting to int *)
+         | [ x ] ->
+           let len =
+             try Int.of_string x with
+             | _ -> -1
+           in
+           if Int.(len >= 0) then `Fixed len else `Bad_request
+         | _ -> `Bad_request)
     ;;
 
     let create req chan =
@@ -162,24 +162,24 @@ module Writer = struct
 
     let write t writer =
       Deferred.create (fun ivar ->
-          match t.kind with
-          | Empty -> Ivar.fill ivar ()
-          | String x ->
-            Output_channel.write writer x;
-            Output_channel.flush writer >>> fun () -> Ivar.fill ivar ()
-          | Bigstring b ->
-            Output_channel.write_bigstring writer b;
-            Output_channel.flush writer >>> fun () -> Ivar.fill ivar ()
-          | Stream xs ->
-            let write_chunk = make_writer t in
-            Pipe.iter ~flushed:Pipe.Flushed.When_value_processed xs ~f:(fun buf ->
-                write_chunk writer buf)
-            >>> fun () ->
-            if is_chunked t
-            then (
-              Output_channel.write writer "0\r\n\r\n";
-              Output_channel.flush writer >>> fun () -> Ivar.fill ivar ())
-            else Ivar.fill ivar ())
+        match t.kind with
+        | Empty -> Ivar.fill ivar ()
+        | String x ->
+          Output_channel.write writer x;
+          Output_channel.flush writer >>> fun () -> Ivar.fill ivar ()
+        | Bigstring b ->
+          Output_channel.write_bigstring writer b;
+          Output_channel.flush writer >>> fun () -> Ivar.fill ivar ()
+        | Stream xs ->
+          let write_chunk = make_writer t in
+          Pipe.iter ~flushed:Pipe.Flushed.When_value_processed xs ~f:(fun buf ->
+            write_chunk writer buf)
+          >>> fun () ->
+          if is_chunked t
+          then (
+            Output_channel.write writer "0\r\n\r\n";
+            Output_channel.flush writer >>> fun () -> Ivar.fill ivar ())
+          else Ivar.fill ivar ())
     ;;
   end
 end

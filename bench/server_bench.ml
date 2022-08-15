@@ -49,8 +49,8 @@ let command =
             (fun _request -> Service.respond_bigstring text)
         in
         Deferred.forever () (fun () ->
-            let%map.Deferred () = after Time.Span.(of_sec 0.5) in
-            Log.Global.printf "Active connections: %d" (Tcp.Server.num_connections server));
+          let%map.Deferred () = after Time.Span.(of_sec 0.5) in
+          Log.Global.printf "Active connections: %d" (Tcp.Server.num_connections server));
         Tcp.Server.close_finished_and_handlers_determined server)
 ;;
 

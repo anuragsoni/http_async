@@ -47,7 +47,7 @@ let%test_unit "Can parse HTTP methods" =
     result
     ~expect:
       (List.map methods ~f:(fun m ->
-           Ok { value = m; consumed = String.length (Meth.to_string m) + 1 }))
+         Ok { value = m; consumed = String.length (Meth.to_string m) + 1 }))
 ;;
 
 let%expect_test "can parse single request" =

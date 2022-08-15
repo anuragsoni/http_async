@@ -5,26 +5,26 @@ exception Partial
 
 let tchar_map =
   Array.init 256 ~f:(fun idx ->
-      match Char.of_int_exn idx with
-      | '0' .. '9'
-      | 'a' .. 'z'
-      | 'A' .. 'Z'
-      | '!'
-      | '#'
-      | '$'
-      | '%'
-      | '&'
-      | '\''
-      | '*'
-      | '+'
-      | '-'
-      | '.'
-      | '^'
-      | '_'
-      | '`'
-      | '|'
-      | '~' -> true
-      | _ -> false)
+    match Char.of_int_exn idx with
+    | '0' .. '9'
+    | 'a' .. 'z'
+    | 'A' .. 'Z'
+    | '!'
+    | '#'
+    | '$'
+    | '%'
+    | '&'
+    | '\''
+    | '*'
+    | '+'
+    | '-'
+    | '.'
+    | '^'
+    | '_'
+    | '`'
+    | '|'
+    | '~' -> true
+    | _ -> false)
 ;;
 
 module Source = struct
@@ -117,25 +117,25 @@ let meth source =
     match pos with
     | 3 ->
       (match source.![0], source.![1], source.![2] with
-      | 'G', 'E', 'T' -> `GET
-      | 'P', 'U', 'T' -> `PUT
-      | _ -> raise_notrace invalid_method)
+       | 'G', 'E', 'T' -> `GET
+       | 'P', 'U', 'T' -> `PUT
+       | _ -> raise_notrace invalid_method)
     | 4 ->
       (match source.![0], source.![1], source.![2], source.![3] with
-      | 'H', 'E', 'A', 'D' -> `HEAD
-      | 'P', 'O', 'S', 'T' -> `POST
-      | _ -> raise_notrace invalid_method)
+       | 'H', 'E', 'A', 'D' -> `HEAD
+       | 'P', 'O', 'S', 'T' -> `POST
+       | _ -> raise_notrace invalid_method)
     | 5 ->
       (match source.![0], source.![1], source.![2], source.![3], source.![4] with
-      | 'P', 'A', 'T', 'C', 'H' -> `PATCH
-      | 'T', 'R', 'A', 'C', 'E' -> `TRACE
-      | _ -> raise_notrace invalid_method)
+       | 'P', 'A', 'T', 'C', 'H' -> `PATCH
+       | 'T', 'R', 'A', 'C', 'E' -> `TRACE
+       | _ -> raise_notrace invalid_method)
     | 6 ->
       (match
          source.![0], source.![1], source.![2], source.![3], source.![4], source.![5]
        with
-      | 'D', 'E', 'L', 'E', 'T', 'E' -> `DELETE
-      | _ -> raise_notrace invalid_method)
+       | 'D', 'E', 'L', 'E', 'T', 'E' -> `DELETE
+       | _ -> raise_notrace invalid_method)
     | 7 ->
       (match
          ( source.![0]
@@ -146,9 +146,9 @@ let meth source =
          , source.![5]
          , source.![6] )
        with
-      | 'C', 'O', 'N', 'N', 'E', 'C', 'T' -> `CONNECT
-      | 'O', 'P', 'T', 'I', 'O', 'N', 'S' -> `OPTIONS
-      | _ -> raise_notrace invalid_method)
+       | 'C', 'O', 'N', 'N', 'E', 'C', 'T' -> `CONNECT
+       | 'O', 'P', 'T', 'I', 'O', 'N', 'S' -> `OPTIONS
+       | _ -> raise_notrace invalid_method)
     | _ -> raise_notrace invalid_method
   in
   Source.unsafe_advance source (pos + 1);
