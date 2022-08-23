@@ -7,6 +7,7 @@ module Request = Request
 module Response = Response
 module Meth = Meth
 module Headers = Headers
+module Buffer_config = Buffer_config
 
 (** [Service] is the core abstraction that represents an HTTP server within http_async.*)
 module Service : sig
@@ -82,7 +83,7 @@ module Server : sig
     -> ?max_accepts_per_batch:int
     -> ?backlog:int
     -> ?socket:([ `Unconnected ], Socket.Address.Inet.t) Socket.t
-    -> ?initial_buffer_size:int
+    -> ?buffer_config:Buffer_config.t
     -> ?error_handler:error_handler
     -> Service.t
     -> (Socket.Address.Inet.t, int) Tcp.Server.t Deferred.t

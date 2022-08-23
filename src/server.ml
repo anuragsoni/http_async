@@ -55,7 +55,7 @@ let run_server_loop ?(error_handler = default_error_handler) handle_request read
       Input_channel.refill reader
       >>> (function
       | `Ok -> loop reader writer handle_request
-      | `Eof | `Buffer_is_full -> Ivar.fill finished ())
+      | `Eof -> Ivar.fill finished ())
     | Error (Fail error) ->
       Logger.debug "Error while parsing HTTP request: %s" (Error.to_string_mach error);
       error_handler `Bad_request
@@ -107,13 +107,15 @@ let run
   ?(max_accepts_per_batch = 64)
   ?backlog
   ?socket
-  ?initial_buffer_size
+  ?(buffer_config = Buffer_config.create ())
   ?error_handler
   service
   =
   Shuttle.Connection.listen
-    ?input_buffer_size:initial_buffer_size
-    ?output_buffer_size:initial_buffer_size
+    ~input_buffer_size:(Buffer_config.initial_size buffer_config)
+    ~max_input_buffer_size:(Buffer_config.max_buffer_size buffer_config)
+    ~output_buffer_size:(Buffer_config.initial_size buffer_config)
+    ~max_output_buffer_size:(Buffer_config.max_buffer_size buffer_config)
     ?max_connections
     ?backlog
     ?socket
@@ -150,6 +152,11 @@ let run_command ?(interrupt = Deferred.never ()) ?readme ?error_handler ~summary
           "-initial-buffer-size"
           ~doc:"int Initial size of the Read and Write buffers used by the server."
           (optional int)
+      and max_buffer_size =
+        flag
+          "-max-buffer-size"
+          ~doc:"int Maximum size of the Read and Write buffers used by the server."
+          (optional int)
       in
       fun () ->
         let%bind.Deferred server =
@@ -159,7 +166,8 @@ let run_command ?(interrupt = Deferred.never ()) ?readme ?error_handler ~summary
             ~max_accepts_per_batch
             ?max_connections
             ?backlog
-            ?initial_buffer_size
+            ~buffer_config:
+              (Buffer_config.create ?initial_size:initial_buffer_size ?max_buffer_size ())
             service
         in
         choose
