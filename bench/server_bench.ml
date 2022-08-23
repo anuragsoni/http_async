@@ -44,7 +44,7 @@ let command =
           Server.run
             ~backlog:11_000
             ~max_accepts_per_batch:64
-            ~initial_buffer_size:0x4000
+            ~buffer_config:(Buffer_config.create ~initial_size:0x4000 ())
             ~where_to_listen:(Tcp.Where_to_listen.of_port port)
             (fun _request -> Service.respond_bigstring text)
         in

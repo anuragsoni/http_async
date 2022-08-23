@@ -22,7 +22,7 @@ module Reader = struct
         Input_channel.refill chan
         >>= function
         | `Eof -> return `Eof
-        | `Ok | `Buffer_is_full -> read_bigstring chan len
+        | `Ok -> read_bigstring chan len
     ;;
 
     let fixed_reader len chan =
@@ -53,7 +53,6 @@ module Reader = struct
             Input_channel.refill chan
             >>| (function
             | `Ok -> `Repeat state
-            | `Buffer_is_full -> `Finished ()
             | `Eof -> `Finished ())
           | Ok (parse_result, consumed) ->
             Input_channel.consume chan consumed;

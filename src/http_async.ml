@@ -7,6 +7,7 @@ module Meth = Meth
 module Request = Request
 module Response = Response
 module Headers = Headers
+module Buffer_config = Buffer_config
 
 module Private = struct
   module Parser = Parser
