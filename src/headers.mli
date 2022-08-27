@@ -10,5 +10,3 @@ val find : t -> string -> string option
 val find_multi : t -> string -> string list
 val empty : t
 val add_unless_exists : t -> key:string -> data:string -> t
-
-include module type of Common_header_names
