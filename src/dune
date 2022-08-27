@@ -3,23 +3,3 @@
  (preprocess
   (pps ppx_jane))
  (libraries shuttle async_kernel.eager_deferred))
-
-(rule
- (targets common_header_names.ml)
- (deps "../tools/header_field_names_iana.csv")
- (action
-  (with-stdout-to
-   %{targets}
-   (run
-    ../tools/gen_http_header_names.exe
-    ../tools/header_field_names_iana.csv))))
-
-(rule
- (targets common_header_names.mli)
- (action
-  (with-stdout-to
-   %{targets}
-   (run
-    ../tools/gen_http_header_names.exe
-    ../tools/header_field_names_iana.csv
-    -mli))))
