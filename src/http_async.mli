@@ -4,6 +4,7 @@ open! Shuttle
 module Logger : Log.Global_intf
 module Status = Status
 module Request = Request
+module Version = Version
 module Response = Response
 module Meth = Meth
 module Headers = Headers
