@@ -20,8 +20,8 @@ open Http_async
 
 let () =
   Command_unix.run
-    (Server.run_command ~summary:"Hello world HTTP Server" (fun _request ->
-       Service.respond_string "Hello World"))
+    (Server.run_command ~summary:"Hello world HTTP Server" (fun (_request, _body) ->
+       return (Response.create `Ok, Body.Writer.string "Hello World")))
 ;;
 ```
 
@@ -40,16 +40,16 @@ let routes =
     [ ( "/hello/:name"
       , fun params _rest ->
           let name = List.Assoc.find_exn params ~equal:String.equal "name" in
-          Service.respond_string (sprintf "Hello, %s" name) )
-    ; ("/", fun _params _rest -> Service.respond_string "Hello World")
+          return (Response.create `Ok, Body.Writer.string (sprintf "Hello, %s" name)) )
+    ; ("/", fun _params _rest -> Response.create `Ok, Body.Writer.string "Hello World")
     ]
 ;;
 
-let service request =
-  let path = Service.resource request in
+let service (request, body) =
+  let path = Request.path request in
   match Dispatch.dispatch routes path with
   | Some response -> response
-  | None -> Service.respond_string ~status:`Not_found "Route not found"
+  | None -> return (Response.create `Not_found, Body.Writer.string "Route not found")
 ;;
 
 let () = Command_unix.run (Server.run_command ~summary:"Hello world HTTP Server" service)

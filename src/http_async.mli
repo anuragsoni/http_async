@@ -10,60 +10,35 @@ module Meth = Meth
 module Headers = Headers
 module Buffer_config = Buffer_config
 
-(** [Service] is the core abstraction that represents an HTTP server within http_async.*)
-module Service : sig
-  type request [@@deriving sexp_of]
-  type response [@@deriving sexp_of]
+module Body : sig
+  (** [Reader] represents streaming request bodies. Readers can work with both fixed
+      length and chunk encoded bodies. *)
+  module Reader : sig
+    type t [@@deriving sexp_of]
 
-  (** [t] is a function that takes a HTTP request and returns a deferred HTTP response. *)
-  type t = request -> response Deferred.t
+    val encoding : t -> [ `Chunked | `Fixed of int ]
+    val pipe : t -> Core.Bigstring.t Core_unix.IOVec.t Async.Pipe.Reader.t
+  end
 
-  (** [resource] returns the path and query for a given request. *)
-  val resource : request -> string
+  module Writer : sig
+    (** [Writer] represents response bodies. It supports both fixed length bodies
+        represented via strings/bigstrings, and streaming bodies. *)
+    type t [@@deriving sexp_of]
 
-  (** [meth] returns the HTTP verb for a given request. *)
-  val meth : request -> Meth.t
+    val encoding : t -> [ `Chunked | `Fixed of int ]
+    val empty : t
+    val string : string -> t
+    val bigstring : Core.Bigstring.t -> t
 
-  (** [body] returns the HTTP request body for a given request. *)
-  val body : request -> Bigstring.t Core_unix.IOVec.t Pipe.Reader.t
-
-  (** [header request key] returns the last header value associates with [key] if one
-      exists. *)
-  val header : request -> string -> string option
-
-  (** [header_multi request key] returns a list of all header values associated with
-      [key]. *)
-  val header_multi : request -> string -> string list
-
-  (** [respond_string] creates a new fixed length encoded response from the user provided
-      string. If the user provided headers don't contain a Content-Length header, one is
-      added with the value set to the string's length. *)
-  val respond_string
-    :  ?headers:(string * string) list
-    -> ?status:Status.t
-    -> string
-    -> response Deferred.t
-
-  (** [respond_bigstring] creates a new fixed length encoded response from the user
-      provided [Bigstring.t]. If the user provided headers don't contain a Content-Length
-      header, one is added with the value set to the bigstring's length. *)
-  val respond_bigstring
-    :  ?headers:(string * string) list
-    -> ?status:Status.t
-    -> Bigstring.t
-    -> response Deferred.t
-
-  (** [respond_stream] creates a new streaming response. The data is chunk-encoded before
-      its sent over the wire. *)
-  val respond_stream
-    :  ?headers:(string * string) list
-    -> ?status:Status.t
-    -> Bigstring.t Core_unix.IOVec.t Pipe.Reader.t
-    -> response Deferred.t
+    val stream
+      :  ?encoding:[ `Chunked | `Fixed of int ]
+      -> Bigstring.t Core_unix.IOVec.t Async.Pipe.Reader.t
+      -> t
+  end
 end
 
 module Server : sig
-  type error_handler = ?exn:Exn.t -> Status.t -> Service.response Deferred.t
+  type error_handler = ?exn:Exn.t -> Status.t -> (Response.t * Body.Writer.t) Deferred.t
 
   (** [run_server_loop] accepts a HTTP service, and returns a callback that can be used to
       drive the server loop created via [Shuttle.Connection.listen]. This allows the user
@@ -71,13 +46,13 @@ module Server : sig
       various Server configuration options like [accept_n], [backlog] and more. *)
   val run_server_loop
     :  ?error_handler:error_handler
-    -> Service.t
+    -> (Request.t * Body.Reader.t -> (Response.t * Body.Writer.t) Deferred.t)
     -> Input_channel.t
     -> Output_channel.t
     -> unit Deferred.t
 
   (** [run] sets up a [Tcp.Server.t] and drives the HTTP server loop with the user
-      provided [Service.t]. *)
+      provided request-handler. *)
   val run
     :  ?where_to_listen:Tcp.Where_to_listen.inet
     -> ?max_connections:int
@@ -86,7 +61,7 @@ module Server : sig
     -> ?socket:([ `Unconnected ], Socket.Address.Inet.t) Socket.t
     -> ?buffer_config:Buffer_config.t
     -> ?error_handler:error_handler
-    -> Service.t
+    -> (Request.t * Body.Reader.t -> (Response.t * Body.Writer.t) Deferred.t)
     -> (Socket.Address.Inet.t, int) Tcp.Server.t Deferred.t
 
   (** [run_command] is similar to [run] but instead returns an [Async.Command.t] that can
@@ -97,7 +72,7 @@ module Server : sig
     -> ?readme:(unit -> string)
     -> ?error_handler:error_handler
     -> summary:string
-    -> Service.t
+    -> (Request.t * Body.Reader.t -> (Response.t * Body.Writer.t) Deferred.t)
     -> Command.t
 end
 
