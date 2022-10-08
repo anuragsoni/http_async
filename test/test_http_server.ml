@@ -3,7 +3,7 @@ open! Async
 open! Shuttle
 open Http_async
 
-let default_service _ = Service.respond_string "Hello World"
+let default_service _ = return (Response.create `Ok, Body.Writer.string "Hello World")
 
 let pipe () =
   Unix.pipe (Info.of_string "test shuttle http")
@@ -19,16 +19,20 @@ let test_post_req_with_fixed_body =
 
 let%expect_test "test simple server" =
   let stdout = Lazy.force Writer.stdout in
-  let handler request =
-    let body = Service.body request in
+  let handler (request, body) =
     let%bind () =
-      Pipe.iter_without_pushback body ~f:(fun v ->
+      Pipe.iter_without_pushback (Body.Reader.pipe body) ~f:(fun v ->
         Writer.write_line stdout (Bigstring.to_string v.buf ~pos:v.pos ~len:v.len))
     in
-    Writer.write_sexp ~hum:true stdout (Service.sexp_of_request request);
-    Service.respond_string
-      ~headers:[ "content-length", "5"; "connection", "close" ]
-      "World"
+    Writer.write_sexp
+      ~hum:true
+      stdout
+      [%sexp { request : Request.t; body : Body.Reader.t }];
+    return
+      ( Response.create
+          ~headers:(Headers.of_rev_list [ "content-length", "5"; "connection", "close" ])
+          `Ok
+      , Body.Writer.string "World" )
   in
   let%bind reader, write_to_reader = pipe () in
   let%bind read_from_writer, writer = pipe () in
@@ -41,9 +45,10 @@ let%expect_test "test simple server" =
   [%expect
     {|
     Hello
-    (((meth POST) (path /hello) (version Http_1_1)
-      (headers ((Host www.example.com) (Content-Length 5))))
-     ((encoding (Fixed 5)) (reader <opaque>))) |}];
+    ((request
+      ((meth POST) (path /hello) (version Http_1_1)
+       (headers ((Host www.example.com) (Content-Length 5)))))
+     (body ((encoding (Fixed 5)) (reader <opaque>)))) |}];
   let%bind () = Output_channel.close writer in
   let%map () =
     Pipe.iter_without_pushback reader_pipe ~f:(fun v -> Writer.writef stdout "%S" v)
@@ -72,7 +77,7 @@ let%expect_test "test_default_error_handler" =
 
 let%expect_test "test_custom_error_handler" =
   let error_handler ?exn:_ status =
-    Service.respond_string ~status "Something bad happened"
+    return (Response.create status, Body.Writer.string "Something bad happened")
   in
   let stdout = Lazy.force Writer.stdout in
   let service _request = failwith "ERROR" in
@@ -106,9 +111,8 @@ let test_post_req_with_chunked_body =
 
 let%expect_test "streaming bodies" =
   let stdout = Lazy.force Writer.stdout in
-  let service request =
-    let body = Service.body request in
-    Service.respond_stream body
+  let service (_request, body) =
+    return (Response.create `Ok, Body.Writer.stream (Body.Reader.pipe body))
   in
   let%bind reader, write_to_reader = pipe () in
   let%bind read_from_writer, writer = pipe () in

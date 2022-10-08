@@ -46,7 +46,8 @@ let command =
             ~max_accepts_per_batch:64
             ~buffer_config:(Buffer_config.create ~initial_size:0x4000 ())
             ~where_to_listen:(Tcp.Where_to_listen.of_port port)
-            (fun _request -> Service.respond_bigstring text)
+            (fun (_request, _body) ->
+            Deferred.return (Response.create `Ok, Body.Writer.bigstring text))
         in
         Deferred.forever () (fun () ->
           let%map.Deferred () = after Time.Span.(of_sec 0.5) in

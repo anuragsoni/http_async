@@ -3,7 +3,7 @@ open! Async
 open! Shuttle
 open Eager_deferred.Use
 
-type error_handler = ?exn:Exn.t -> Status.t -> Service.response Deferred.t
+type error_handler = ?exn:Exn.t -> Status.t -> (Response.t * Body.Writer.t) Deferred.t
 
 let keep_alive headers =
   match Headers.find headers "connection" with
@@ -36,10 +36,12 @@ let write_response writer encoding res =
 ;;
 
 let default_error_handler ?exn:_ status =
-  Service.respond_string
-    ~headers:[ "Connection", "close"; "Content-Length", "0" ]
-    ~status
-    ""
+  let response =
+    Response.create
+      ~headers:(Headers.of_rev_list [ "Connection", "close"; "Content-Length", "0" ])
+      status
+  in
+  return (response, Body.Writer.empty)
 ;;
 
 let run_server_loop ?(error_handler = default_error_handler) handle_request reader writer =

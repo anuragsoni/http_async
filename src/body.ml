@@ -37,7 +37,7 @@ module Reader = struct
             >>= fun () ->
             Pipe.downstream_flushed writer
             >>= fun _ ->
-            Input_channel.consume chan chunk.len;
+            Input_channel.consume chan consumed;
             if consumed = len
             then return (`Finished ())
             else return (`Repeat (len - consumed))))
@@ -55,18 +55,22 @@ module Reader = struct
             | `Ok -> `Repeat state
             | `Eof -> `Finished ())
           | Ok (parse_result, consumed) ->
-            Input_channel.consume chan consumed;
             (match parse_result with
              | Parser.Chunk_complete chunk ->
                Pipe.write_if_open writer chunk
                >>= fun () ->
-               Pipe.downstream_flushed writer >>| fun _ -> `Repeat Parser.Start_chunk
+               Pipe.downstream_flushed writer
+               >>| fun _ ->
+               Input_channel.consume chan consumed;
+               `Repeat Parser.Start_chunk
              | Parser.Done -> return (`Finished ())
              | Parser.Partial_chunk (chunk, to_consume) ->
                Pipe.write_if_open writer chunk
                >>= fun () ->
                Pipe.downstream_flushed writer
-               >>| fun _ -> `Repeat (Parser.Continue_chunk to_consume))))
+               >>| fun _ ->
+               Input_channel.consume chan consumed;
+               `Repeat (Parser.Continue_chunk to_consume))))
     ;;
 
     let get_transfer_encoding headers =
@@ -162,7 +166,7 @@ module Writer = struct
     let write t writer =
       Deferred.create (fun ivar ->
         match t.kind with
-        | Empty -> Ivar.fill ivar ()
+        | Empty -> Output_channel.flush writer >>> fun () -> Ivar.fill ivar ()
         | String x ->
           Output_channel.write writer x;
           Output_channel.flush writer >>> fun () -> Ivar.fill ivar ()
