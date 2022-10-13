@@ -1,7 +1,6 @@
 open! Core
 open! Async
 open! Shuttle
-open Eager_deferred.Use
 
 type error_handler = ?exn:Exn.t -> Status.t -> (Response.t * Body.Writer.t) Deferred.t
 
