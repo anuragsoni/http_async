@@ -38,7 +38,11 @@ module Body : sig
 end
 
 module Server : sig
-  type error_handler = ?exn:Exn.t -> Status.t -> (Response.t * Body.Writer.t) Deferred.t
+  type error_handler =
+    ?exn:Exn.t
+    -> ?request:Request.t
+    -> Status.t
+    -> (Response.t * Body.Writer.t) Deferred.t
 
   (** [run_server_loop] accepts a HTTP service, and returns a callback that can be used to
       drive the server loop created via [Shuttle.Connection.listen]. This allows the user

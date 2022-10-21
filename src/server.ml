@@ -2,7 +2,8 @@ open! Core
 open! Async
 open! Shuttle
 
-type error_handler = ?exn:Exn.t -> Status.t -> (Response.t * Body.Writer.t) Deferred.t
+type error_handler =
+  ?exn:Exn.t -> ?request:Request.t -> Status.t -> (Response.t * Body.Writer.t) Deferred.t
 
 let keep_alive headers =
   match Headers.find headers "connection" with
@@ -34,7 +35,7 @@ let write_response writer encoding res =
   Output_channel.write writer "\r\n"
 ;;
 
-let default_error_handler ?exn:_ status =
+let default_error_handler ?exn:_ ?request:_ status =
   let response =
     Response.create
       ~headers:(Headers.of_rev_list [ "Connection", "close"; "Content-Length", "0" ])
@@ -55,26 +56,18 @@ let run_server_loop ?(error_handler = default_error_handler) handle_request read
       | `Ok -> loop reader writer handle_request
       | `Eof -> Ivar.fill finished ())
     | Error (Fail error) ->
-      Logger.debug "Error while parsing HTTP request: %s" (Error.to_string_mach error);
-      error_handler `Bad_request
+      error_handler ~exn:(Error.to_exn error) `Bad_request
       >>> fun (res, res_body) ->
       write_response writer (Body.Writer.encoding res_body) res;
-      Body.Writer.Private.write res_body writer
-      >>> fun () ->
-      Output_channel.schedule_flush writer;
-      Ivar.fill finished ()
+      Body.Writer.Private.write res_body writer >>> fun () -> Ivar.fill finished ()
     | Ok (req, consumed) ->
       Input_channel.consume reader consumed;
       (match Body.Reader.Private.create req reader with
-       | Error _error ->
-         Logger.debug "Invalid request body";
-         error_handler `Bad_request
+       | Error error ->
+         error_handler ~exn:(Error.to_exn error) ~request:req `Bad_request
          >>> fun (res, res_body) ->
          write_response writer (Body.Writer.encoding res_body) res;
-         Body.Writer.Private.write res_body writer
-         >>> fun () ->
-         Output_channel.schedule_flush writer;
-         Ivar.fill finished ()
+         Body.Writer.Private.write res_body writer >>> fun () -> Ivar.fill finished ()
        | Ok req_body ->
          handle_request (req, req_body)
          >>> fun (res, res_body) ->
