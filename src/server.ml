@@ -2,7 +2,12 @@ open! Core
 open! Async
 open! Shuttle
 
-type error_handler = ?exn:Exn.t -> Status.t -> (Response.t * Body.Writer.t) Deferred.t
+type error_handler =
+  ?exn:Exn.t -> ?request:Request.t -> Status.t -> (Response.t * Body.Writer.t) Deferred.t
+[@@deriving sexp_of]
+
+type service = Request.t * Body.Reader.t -> (Response.t * Body.Writer.t) Deferred.t
+[@@deriving sexp_of]
 
 let keep_alive headers =
   match Headers.find headers "connection" with
@@ -34,7 +39,7 @@ let write_response writer encoding res =
   Output_channel.write writer "\r\n"
 ;;
 
-let default_error_handler ?exn:_ status =
+let default_error_handler ?exn:_ ?request:_ status =
   let response =
     Response.create
       ~headers:(Headers.of_rev_list [ "Connection", "close"; "Content-Length", "0" ])
@@ -43,60 +48,88 @@ let default_error_handler ?exn:_ status =
   return (response, Body.Writer.empty)
 ;;
 
-let run_server_loop ?(error_handler = default_error_handler) handle_request reader writer =
-  let monitor = Monitor.create () in
-  let finished = Ivar.create () in
-  let rec loop reader writer handle_request =
-    let view = Input_channel.view reader in
+module Context = struct
+  type t =
+    { service : service
+    ; error_handler : error_handler
+    ; reader : Input_channel.t
+    ; writer : Output_channel.t
+    ; requests : Request.t Moption.t
+    ; closed : unit Ivar.t
+    }
+  [@@deriving sexp_of]
+
+  let create service error_handler reader writer =
+    { service
+    ; error_handler
+    ; reader
+    ; writer
+    ; requests = Moption.create ()
+    ; closed = Ivar.create ()
+    }
+  ;;
+
+  let report_error t exn status_code =
+    if Ivar.is_full t.closed
+    then (
+      Logger.error !"Error handler invoked for a closed connection: %{sexp: Exn.t}" exn;
+      Deferred.unit)
+    else (
+      let request = Moption.get t.requests in
+      t.error_handler ?request ~exn status_code
+      >>= fun (res, res_body) ->
+      write_response t.writer (Body.Writer.encoding res_body) res;
+      Body.Writer.Private.write res_body t.writer)
+  ;;
+
+  let rec server_loop t =
+    let view = Input_channel.view t.reader in
     match Parser.parse_request view.buf ~pos:view.pos ~len:view.len with
     | Error Partial ->
-      Input_channel.refill reader
-      >>> (function
-      | `Ok -> loop reader writer handle_request
-      | `Eof -> Ivar.fill finished ())
+      upon (Input_channel.refill t.reader) (function
+        | `Ok -> server_loop t
+        | `Eof ->
+          Logger.debug "Unexpected EOF before a full request was parsed";
+          Ivar.fill_if_empty t.closed ())
     | Error (Fail error) ->
-      Logger.debug "Error while parsing HTTP request: %s" (Error.to_string_mach error);
-      error_handler `Bad_request
-      >>> fun (res, res_body) ->
-      write_response writer (Body.Writer.encoding res_body) res;
-      Body.Writer.Private.write res_body writer
-      >>> fun () ->
-      Output_channel.schedule_flush writer;
-      Ivar.fill finished ()
+      upon
+        (report_error t (Error.to_exn error) `Bad_request)
+        (fun () -> Ivar.fill_if_empty t.closed ())
     | Ok (req, consumed) ->
-      Input_channel.consume reader consumed;
-      (match Body.Reader.Private.create req reader with
-       | Error _error ->
-         Logger.debug "Invalid request body";
-         error_handler `Bad_request
-         >>> fun (res, res_body) ->
-         write_response writer (Body.Writer.encoding res_body) res;
-         Body.Writer.Private.write res_body writer
-         >>> fun () ->
-         Output_channel.schedule_flush writer;
-         Ivar.fill finished ()
+      Input_channel.consume t.reader consumed;
+      Moption.set_some t.requests req;
+      (match Body.Reader.Private.create req t.reader with
+       | Error error ->
+         upon
+           (report_error t (Error.to_exn error) `Bad_request)
+           (fun () -> Ivar.fill_if_empty t.closed ())
        | Ok req_body ->
-         handle_request (req, req_body)
-         >>> fun (res, res_body) ->
-         let keep_alive =
-           keep_alive (Request.headers req) && keep_alive (Response.headers res)
-         in
-         write_response writer (Body.Writer.encoding res_body) res;
-         Body.Writer.Private.write res_body writer
-         >>> fun () ->
-         Body.Reader.drain req_body
-         >>> fun () ->
-         if keep_alive then loop reader writer handle_request else Ivar.fill finished ())
-  in
-  (Monitor.detach_and_get_next_error monitor
-  >>> fun exn ->
-  error_handler ~exn `Internal_server_error
-  >>> fun (res, res_body) ->
-  write_response writer (Body.Writer.encoding res_body) res;
-  Body.Writer.Private.write res_body writer >>> fun () -> Ivar.fill finished ());
+         upon
+           (t.service (req, req_body))
+           (fun (res, res_body) ->
+             let keep_alive =
+               keep_alive (Request.headers req) && keep_alive (Response.headers res)
+             in
+             write_response t.writer (Body.Writer.encoding res_body) res;
+             upon (Body.Writer.Private.write res_body t.writer) (fun () ->
+               upon (Body.Reader.drain req_body) (fun () ->
+                 if keep_alive
+                 then (
+                   Moption.set_none t.requests;
+                   server_loop t)
+                 else Ivar.fill_if_empty t.closed ()))))
+  ;;
+end
+
+let run_server_loop ?(error_handler = default_error_handler) handle_request reader writer =
+  let monitor = Monitor.create () in
+  let context = Context.create handle_request error_handler reader writer in
+  upon (Monitor.detach_and_get_next_error monitor) (fun exn ->
+    upon (Context.report_error context exn `Internal_server_error) (fun () ->
+      Ivar.fill_if_empty context.closed ()));
   Scheduler.within ~priority:Priority.Normal ~monitor (fun () ->
-    loop reader writer handle_request);
-  Ivar.read finished
+    Context.server_loop context);
+  Ivar.read context.closed
 ;;
 
 let run

@@ -38,7 +38,13 @@ module Body : sig
 end
 
 module Server : sig
-  type error_handler = ?exn:Exn.t -> Status.t -> (Response.t * Body.Writer.t) Deferred.t
+  type error_handler =
+    ?exn:Exn.t
+    -> ?request:Request.t
+    -> Status.t
+    -> (Response.t * Body.Writer.t) Deferred.t
+
+  type service = Request.t * Body.Reader.t -> (Response.t * Body.Writer.t) Deferred.t
 
   (** [run_server_loop] accepts a HTTP service, and returns a callback that can be used to
       drive the server loop created via [Shuttle.Connection.listen]. This allows the user
@@ -46,7 +52,7 @@ module Server : sig
       various Server configuration options like [accept_n], [backlog] and more. *)
   val run_server_loop
     :  ?error_handler:error_handler
-    -> (Request.t * Body.Reader.t -> (Response.t * Body.Writer.t) Deferred.t)
+    -> service
     -> Input_channel.t
     -> Output_channel.t
     -> unit Deferred.t
@@ -61,7 +67,7 @@ module Server : sig
     -> ?socket:([ `Unconnected ], Socket.Address.Inet.t) Socket.t
     -> ?buffer_config:Buffer_config.t
     -> ?error_handler:error_handler
-    -> (Request.t * Body.Reader.t -> (Response.t * Body.Writer.t) Deferred.t)
+    -> service
     -> (Socket.Address.Inet.t, int) Tcp.Server.t Deferred.t
 
   (** [run_command] is similar to [run] but instead returns an [Async.Command.t] that can
@@ -72,7 +78,7 @@ module Server : sig
     -> ?readme:(unit -> string)
     -> ?error_handler:error_handler
     -> summary:string
-    -> (Request.t * Body.Reader.t -> (Response.t * Body.Writer.t) Deferred.t)
+    -> service
     -> Command.t
 end
 

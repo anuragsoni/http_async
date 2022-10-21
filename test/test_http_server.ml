@@ -76,8 +76,14 @@ let%expect_test "test_default_error_handler" =
 ;;
 
 let%expect_test "test_custom_error_handler" =
-  let error_handler ?exn:_ status =
-    return (Response.create status, Body.Writer.string "Something bad happened")
+  let error_handler ?exn:_ ?request status =
+    let body =
+      match request with
+      | None -> "Something bad happened"
+      | Some request ->
+        sprintf "Something bad happened for request: %s" (Request.path request)
+    in
+    return (Response.create status, Body.Writer.string body)
   in
   let stdout = Lazy.force Writer.stdout in
   let service _request = failwith "ERROR" in
@@ -95,7 +101,7 @@ let%expect_test "test_custom_error_handler" =
     Pipe.iter_without_pushback reader_pipe ~f:(fun chunk ->
       Writer.writef stdout "%S" chunk)
   in
-  [%expect {| "HTTP/1.1 500 \r\nContent-Length: 22\r\n\r\nSomething bad happened" |}]
+  [%expect {| "HTTP/1.1 500 \r\nContent-Length: 42\r\n\r\nSomething bad happened for request: /hello" |}]
 ;;
 
 let test_post_req_with_chunked_body =
