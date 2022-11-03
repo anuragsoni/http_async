@@ -2,13 +2,18 @@
 
 HTTP 1.1 server for async applications.
 
-### Getting Started
+### Installation
 
-This library isn't published to the opam repository yet so it requires pinning to the development version of dependencies.
+###### To use the version published on opam:
 
 ```
-opam pin add -n http_async.dev git+https://github.com/anuragsoni/http_async.git
 opam install http_async
+```
+
+###### For the development version:
+
+```
+opam pin add http_async.dev git+https://github.com/anuragsoni/http_async.git
 ```
 
 ### Hello World
