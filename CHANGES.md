@@ -1,3 +1,7 @@
+# 0.1.1
+
+* Parsing error should forward request to error handler if the request is fully parsed
+
 # 0.1.0
 
 * Don't use Eager_deferred
