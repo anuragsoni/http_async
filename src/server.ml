@@ -93,13 +93,13 @@ let run_server_loop ?(error_handler = default_error_handler) handle_request read
 ;;
 
 let run
-  ?(where_to_listen = Tcp.Where_to_listen.of_port 8080)
   ?max_connections
   ?(max_accepts_per_batch = 64)
   ?backlog
   ?socket
   ?(buffer_config = Buffer_config.create ())
   ?error_handler
+  ~where_to_listen
   service
   =
   Shuttle.Connection.listen

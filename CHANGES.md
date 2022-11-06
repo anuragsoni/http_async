@@ -1,3 +1,7 @@
+# next
+
+* Allow running http_async servers on unix domain sockets
+
 # 0.1.1
 
 * Parsing error should forward request to error handler if the request is fully parsed
