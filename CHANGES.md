@@ -1,6 +1,7 @@
-# next
+# 0.2.0
 
 * Allow running http_async servers on unix domain sockets
+* Forward peer socket address to service and error handler
 
 # 0.1.1
 

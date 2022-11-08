@@ -98,7 +98,7 @@ let run
   ?backlog
   ?socket
   ?(buffer_config = Buffer_config.create ())
-  ?error_handler
+  ?(error_handler = fun _ -> default_error_handler)
   ~where_to_listen
   service
   =
@@ -113,10 +113,19 @@ let run
     ~max_accepts_per_batch
     where_to_listen
     ~on_handler_error:`Raise
-    ~f:(fun _addr reader writer -> run_server_loop ?error_handler service reader writer)
+    ~f:(fun addr reader writer ->
+    let service = service addr in
+    let error_handler = error_handler addr in
+    run_server_loop ~error_handler service reader writer)
 ;;
 
-let run_command ?(interrupt = Deferred.never ()) ?readme ?error_handler ~summary service =
+let run_command
+  ?(interrupt = Deferred.never ())
+  ?readme
+  ?(error_handler = fun _ -> default_error_handler)
+  ~summary
+  service
+  =
   Command.async
     ~summary
     ?readme
@@ -152,7 +161,7 @@ let run_command ?(interrupt = Deferred.never ()) ?readme ?error_handler ~summary
       fun () ->
         let%bind.Deferred server =
           run
-            ?error_handler
+            ~error_handler
             ~where_to_listen:(Tcp.Where_to_listen.of_port port)
             ~max_accepts_per_batch
             ?max_connections

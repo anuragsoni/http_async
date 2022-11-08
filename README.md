@@ -25,7 +25,11 @@ open Http_async
 
 let () =
   Command_unix.run
-    (Server.run_command ~summary:"Hello world HTTP Server" (fun (_request, _body) ->
+    (Server.run_command ~summary:"Hello world HTTP Server" (fun addr (request, _body) ->
+       Log.Global.info
+         "(%s): %s"
+         (Socket.Address.Inet.to_string addr)
+         (Request.path request);
        return (Response.create `Ok, Body.Writer.string "Hello World")))
 ;;
 ```
@@ -50,7 +54,7 @@ let routes =
     ]
 ;;
 
-let service (request, body) =
+let service _addr (request, body) =
   let path = Request.path request in
   match Dispatch.dispatch routes path with
   | Some response -> response

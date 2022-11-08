@@ -18,7 +18,12 @@ let test_post_req_with_fixed_body =
 ;;
 
 let test_post_req_with_invalid_body_length =
-  "POST /hello HTTP/1.1\r\nHost: www.example.com   \r\nContent-Length: 5\r\nContent-Length: 6\r\n\r\nHello\r\n"
+  "POST /hello HTTP/1.1\r\n\
+   Host: www.example.com   \r\n\
+   Content-Length: 5\r\n\
+   Content-Length: 6\r\n\
+   \r\n\
+   Hello\r\n"
 ;;
 
 let%expect_test "test simple server" =
@@ -105,7 +110,8 @@ let%expect_test "test_custom_error_handler" =
     Pipe.iter_without_pushback reader_pipe ~f:(fun chunk ->
       Writer.writef stdout "%S" chunk)
   in
-  [%expect {| "HTTP/1.1 400 \r\nContent-Length: 41\r\n\r\nSomething bad happened in request: /hello" |}]
+  [%expect
+    {| "HTTP/1.1 400 \r\nContent-Length: 41\r\n\r\nSomething bad happened in request: /hello" |}]
 ;;
 
 let%expect_test "catches bad request payload" =

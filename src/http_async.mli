@@ -63,9 +63,9 @@ module Server : sig
     -> ?backlog:int
     -> ?socket:([ `Unconnected ], ([< Socket.Address.t ] as 'a)) Socket.t
     -> ?buffer_config:Buffer_config.t
-    -> ?error_handler:error_handler
+    -> ?error_handler:('a -> error_handler)
     -> where_to_listen:('a, 'b) Tcp.Where_to_listen.t
-    -> (Request.t * Body.Reader.t -> (Response.t * Body.Writer.t) Deferred.t)
+    -> ('a -> Request.t * Body.Reader.t -> (Response.t * Body.Writer.t) Deferred.t)
     -> ('a, 'b) Tcp.Server.t Deferred.t
 
   (** [run_command] is similar to [run] but instead returns an [Async.Command.t] that can
@@ -74,9 +74,11 @@ module Server : sig
   val run_command
     :  ?interrupt:unit Deferred.t
     -> ?readme:(unit -> string)
-    -> ?error_handler:error_handler
+    -> ?error_handler:(Socket.Address.Inet.t -> error_handler)
     -> summary:string
-    -> (Request.t * Body.Reader.t -> (Response.t * Body.Writer.t) Deferred.t)
+    -> (Socket.Address.Inet.t
+        -> Request.t * Body.Reader.t
+        -> (Response.t * Body.Writer.t) Deferred.t)
     -> Command.t
 end
 
