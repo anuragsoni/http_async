@@ -57,7 +57,7 @@ let%expect_test "test simple server" =
     ((request
       ((meth POST) (path /hello) (version Http_1_1)
        (headers ((Host www.example.com) (Content-Length 5)))))
-     (body ((encoding (Fixed 5)) (reader <opaque>)))) |}];
+     (body (Stream (encoding (Fixed 5)) (reader <opaque>)))) |}];
   let%bind () = Output_channel.close writer in
   let%map () =
     Pipe.iter_without_pushback reader_pipe ~f:(fun v -> Writer.writef stdout "%S" v)

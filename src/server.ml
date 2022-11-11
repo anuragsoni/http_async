@@ -77,9 +77,17 @@ let run_server_loop ?(error_handler = default_error_handler) handle_request read
          write_response writer (Body.Writer.encoding res_body) res;
          Body.Writer.Private.write res_body writer
          >>> fun () ->
-         Body.Reader.drain req_body
-         >>> fun () ->
-         if keep_alive then loop reader writer handle_request else Ivar.fill finished ())
+         (match req_body with
+          | Body.Reader.Empty ->
+            if keep_alive
+            then loop reader writer handle_request
+            else Ivar.fill finished ()
+          | Stream { reader = body; _ } ->
+            Pipe.drain body
+            >>> fun () ->
+            if keep_alive
+            then loop reader writer handle_request
+            else Ivar.fill finished ()))
   in
   (Monitor.detach_and_get_next_error monitor
   >>> fun exn ->

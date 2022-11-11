@@ -4,12 +4,14 @@ open Shuttle
 
 module Reader = struct
   type t =
-    { encoding : [ `Chunked | `Fixed of int ]
-    ; reader : (Bigstring.t Core_unix.IOVec.t Pipe.Reader.t[@sexp.opaque])
-    }
+    | Empty
+    | Stream of
+        { encoding : [ `Chunked | `Fixed of int ]
+        ; reader : (Bigstring.t Core_unix.IOVec.t Pipe.Reader.t[@sexp.opaque])
+        }
   [@@deriving sexp_of]
 
-  let empty = { encoding = `Fixed 0; reader = Pipe.empty () }
+  let empty = Empty
 
   module Private = struct
     let rec read_bigstring chan len =
@@ -99,15 +101,23 @@ module Reader = struct
       | `Fixed 0 -> Ok empty
       | `Fixed len as encoding ->
         let reader = fixed_reader len chan in
-        Ok { encoding; reader }
-      | `Chunked as encoding -> Ok { encoding; reader = chunked_reader chan }
+        Ok (Stream { encoding; reader })
+      | `Chunked as encoding -> Ok (Stream { encoding; reader = chunked_reader chan })
       | `Bad_request -> Or_error.error_s [%sexp "Invalid transfer encoding"]
     ;;
   end
 
-  let encoding t = t.encoding
-  let pipe t = t.reader
-  let drain t = Pipe.drain t.reader
+  let encoding t =
+    match t with
+    | Empty -> `Fixed 0
+    | Stream { encoding; _ } -> encoding
+  ;;
+
+  let pipe t =
+    match t with
+    | Empty -> Pipe.empty ()
+    | Stream { reader; _ } -> reader
+  ;;
 end
 
 module Writer = struct
