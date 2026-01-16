@@ -1,3 +1,5 @@
+# See https://github.com/anuragsoni/shuttle_http instead
+
 # Http_async
 
 HTTP 1.1 server for async applications.
